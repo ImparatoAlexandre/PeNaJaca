@@ -1,0 +1,10 @@
+# Fica so em cada maquina (dev / prod), nao vai para o Git
+backup/
+csv ativos/
+__pycache__/
+*.pyc
+*.lock
+*.duckdb
+*.duckdb.wal
+*.sqlite
+.vscode/
