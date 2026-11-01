@@ -227,6 +227,24 @@ def modo_rodada(ativo):
         log(f"modo_rodada({ativo}) nao aplicado: {e}")
 
 
+def chamado_pelo_agendador():
+    """True se o processo pai e o Agendador de Tarefas (svchost/taskhostw); na duvida devolve True."""
+    try:
+        from ctypes import wintypes
+        k32 = ctypes.windll.kernel32
+        k32.OpenProcess.restype = wintypes.HANDLE
+        h = k32.OpenProcess(0x1000, False, os.getppid())  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not h:
+            return True
+        buf = ctypes.create_unicode_buffer(1024)
+        tam = wintypes.DWORD(1024)
+        ok = k32.QueryFullProcessImageNameW(h, 0, buf, ctypes.byref(tam))
+        k32.CloseHandle(h)
+        return not ok or Path(buf.value).name.lower() in ("svchost.exe", "taskhostw.exe", "taskeng.exe")
+    except Exception:
+        return True
+
+
 def exige_pregao_hoje(agora):
     return agora.weekday() < 5 and (agora.hour, agora.minute) >= ABERTURA_MERCADO
 
@@ -236,10 +254,12 @@ def main():
 
     hoje = datetime.now()
     if hoje.weekday() >= 5:
-        if "--forcar" not in sys.argv:  # teste manual: python Operacoes_atualizacao.py --forcar
+        # a tarefa agendada dispara todos os dias: so ela para no fim de semana; execucao manual (VS Code,
+        # terminal) roda ate ao fim, como --forcar
+        if "--forcar" not in sys.argv and chamado_pelo_agendador():
             log("FIM DE SEMANA - atualizacao nao executada")
             return
-        log("FIM DE SEMANA - execucao forcada (--forcar)")
+        log("FIM DE SEMANA - execucao manual")
 
     if not adquirir_trava():
         return
