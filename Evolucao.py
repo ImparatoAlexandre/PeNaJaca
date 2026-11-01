@@ -13,7 +13,7 @@ import sqlite3
 DB_FILE = Path(r"C:\BD\Stocks.duckdb")
 SQLITE_FILE = Path(r"C:\Metabase\data\visualizacao.sqlite")
 TABELA_SAIDA = "Evolucao"
-DATA_INICIO = "20260101"
+DATA_INICIO = "20260102"
 
 QUERY_EVOLUCAO = f"""
 CREATE OR REPLACE TABLE {TABELA_SAIDA} AS
