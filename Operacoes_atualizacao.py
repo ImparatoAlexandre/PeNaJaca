@@ -236,8 +236,10 @@ def main():
 
     hoje = datetime.now()
     if hoje.weekday() >= 5:
-        log("FIM DE SEMANA - atualizacao nao executada")
-        return
+        if "--forcar" not in sys.argv:  # teste manual: python Operacoes_atualizacao.py --forcar
+            log("FIM DE SEMANA - atualizacao nao executada")
+            return
+        log("FIM DE SEMANA - execucao forcada (--forcar)")
 
     if not adquirir_trava():
         return
