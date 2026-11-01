@@ -2,7 +2,7 @@
 # LOG INICIAL (prova de execucao)
 # =========================
 from datetime import datetime
-with open(r"C:\Users\impar\OneDrive\DataMarket\TESTE_TASK.txt", "a") as f:
+with open(r"C:\DataMarket\TESTE_TASK.txt", "a") as f:
     f.write(f"Task executou -> {datetime.now()}\n")
 
 # =========================
@@ -20,7 +20,7 @@ try:
     warnings.filterwarnings("ignore")
 
 except Exception as e:
-    with open(r"C:\Users\impar\OneDrive\DataMarket\IMPORT_ERROR.txt", "a") as f:
+    with open(r"C:\DataMarket\IMPORT_ERROR.txt", "a") as f:
         f.write(str(e) + "\n")
     raise
 
@@ -249,7 +249,7 @@ resultados = []
 total_stocks = len(stocks)
 for idx, ticker_symbol in enumerate(stocks, start=1):
     print(f"[{idx}/{total_stocks}] Processando {ticker_symbol}", flush=True)
-    with open(r"C:\Users\impar\OneDrive\DataMarket\CURRENT_TICKER.txt", "w") as f:
+    with open(r"C:\DataMarket\CURRENT_TICKER.txt", "w") as f:
         f.write(f"{datetime.now()} -> {idx}/{total_stocks} {ticker_symbol}\n")
 
     try:
@@ -257,7 +257,7 @@ for idx, ticker_symbol in enumerate(stocks, start=1):
         print(f"[{idx}/{total_stocks}] OK {ticker_symbol}", flush=True)
     except Exception as e:
         print(f"[{idx}/{total_stocks}] ERRO {ticker_symbol}: {e}", flush=True)
-        with open(r"C:\Users\impar\OneDrive\DataMarket\ERROR_LOG.txt", "a") as f:
+        with open(r"C:\DataMarket\ERROR_LOG.txt", "a") as f:
             f.write(f"{datetime.now()} -> {ticker_symbol} -> {str(e)}\n")
         resultados.append(pd.DataFrame({"ticker": [ticker_symbol], "mensagem": [f"Erro ao buscar/processar {ticker_symbol}: {e}"]}))
 
@@ -292,7 +292,7 @@ else:
 # =========================
 # FINAL
 # =========================
-with open(r"C:\Users\impar\OneDrive\DataMarket\FINAL_STATUS.txt", "a") as f:
+with open(r"C:\DataMarket\FINAL_STATUS.txt", "a") as f:
     f.write(f"{datetime.now()} -> terminou stocks3.csv periodo {DATA_INICIO} ate {DATA_FIM} com {len(final)} linhas; Stocks_Ind no periodo {linhas_gravadas} linhas\n")
 
 

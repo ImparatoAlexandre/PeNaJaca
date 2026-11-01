@@ -8,10 +8,6 @@ from datetime import datetime, timedelta
 import duckdb
 import numpy as np
 import pandas as pd
-from openpyxl import load_workbook
-from openpyxl.styles import Font
-from openpyxl.utils import get_column_letter
-from openpyxl.worksheet.pagebreak import Break
 
 with open(r"C:\DataMarket\TESTE_TASK.txt", "a", encoding="utf-8") as f:
     f.write(f"Task executou -> {datetime.now()}\n")
@@ -25,10 +21,8 @@ DATA_FIM_FILTRO = datetime.now().strftime("%Y%m%d")
 OUTPUT_DIR = r"C:\DataMarket"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-EXCEL_FILE = os.path.join(OUTPUT_DIR, "DataMarket.xlsx")
 DB_FILE = r"C:\BD\Stocks.duckdb"
 LOG_FILE = r"C:\DataMarket\FINAL_STATUS.txt"
-base_sheet_name = datetime.now().strftime("%Y-%m-%d_%H-%M")
 
 pd.set_option("display.max_columns", None)
 pd.set_option("display.width", 200)
@@ -112,36 +106,6 @@ def gravar_oper_fase1(con, operacoes_df):
     return len(operacoes_df)
 
 
-def gravar_excel(final):
-    sheet_name = base_sheet_name
-
-    if os.path.exists(EXCEL_FILE):
-        with pd.ExcelWriter(EXCEL_FILE, engine="openpyxl", mode="a") as writer:
-            final.to_excel(writer, sheet_name=sheet_name, index=False)
-    else:
-        with pd.ExcelWriter(EXCEL_FILE, engine="openpyxl") as writer:
-            final.to_excel(writer, sheet_name=sheet_name, index=False)
-
-    wb = load_workbook(EXCEL_FILE)
-    ws = wb[sheet_name]
-
-    fonte_padrao = Font(name="Calibri", size=10)
-    for row in ws.iter_rows():
-        for cell in row:
-            cell.font = fonte_padrao
-
-    for col_idx in range(1, ws.max_column + 1):
-        ws.column_dimensions[get_column_letter(col_idx)].width = 6.0
-
-    ws.print_area = f"A1:Q{ws.max_row}"
-    ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
-    ws.page_setup.fitToWidth = 1
-    ws.page_setup.fitToHeight = False
-    ws.page_breaks = []
-    ws.col_breaks.append(Break(id=13))
-    wb.save(EXCEL_FILE)
-
-
 def main():
     con = duckdb.connect(DB_FILE)
 
@@ -157,12 +121,6 @@ def main():
     print(f"Operacoes encontradas: {linhas_gravadas}")
     print(final.to_string(index=False))
     print("\n==================================================\n")
-
-    try:
-        gravar_excel(final)
-    except Exception as e:
-        with open(r"C:\DataMarket\ERROR_EXCEL.txt", "a", encoding="utf-8") as f:
-            f.write(f"Operacoes_fase1 -> {str(e)}\n")
 
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(
