@@ -13,7 +13,7 @@ SQLITE_FILE = r"C:\Metabase\data\visualizacao.sqlite"
 TABELA_LIQUIDEZ = "Stocks_OPC_liquidez"
 TABELA_OPC = "Call_Put_dados"
 
-QUANTIDADE_VENCIMENTOS = 4
+QUANTIDADE_VENCIMENTOS = 3  # 3 sextas chegam: modelos usam a 1.a com >= 10 dias uteis (no maximo a 3.a), termometro as 2 primeiras
 FAIXA_STRIKES = 0.20     # todos os strikes da cadeia a +-20% do preco, nos QUANTIDADE_VENCIMENTOS vencimentos (sexta)
 DIAS_SQLITE = 30         # SQLite do Metabase recebe so as recolhas reais dos ultimos 30 dias (a DuckDB guarda tudo)
 # Contratos das operacoes (fora da faixa ou de tickers que sairam da liquidez) continuam a ser recolhidos ate ao vencimento.
