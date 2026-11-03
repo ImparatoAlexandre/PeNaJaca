@@ -75,21 +75,17 @@ def exportar_oper_abertas_sqlite(con):
         FROM oper_abertas
         ORDER BY data_operacao DESC, ticker, data
         """).fetchdf()
-    df_stocks_ind = con.execute("""
-        SELECT *
-        FROM Stocks_Ind
-        ORDER BY data DESC, ticker
-        """).fetchdf()
 
     import sqlite3
     con_sqlite = sqlite3.connect(SQLITE_DB_FILE)
     try:
         df_oper_abertas.to_sql(SQLITE_TABLE, con_sqlite, if_exists="replace", index=False)
-        df_stocks_ind.to_sql("Stocks_Ind", con_sqlite, if_exists="replace", index=False)
     finally:
         con_sqlite.close()
 
-    return len(df_oper_abertas), len(df_stocks_ind)
+    # Stocks_Ind vai para o SQLite so na sincronizacao final do Operacoes_atualizacao (menos regravacoes com o
+    # Metabase a ler o arquivo)
+    return len(df_oper_abertas), "-"
 
 
 def exportar_oper_abertas_sqlite_seguro(con):

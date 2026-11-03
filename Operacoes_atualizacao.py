@@ -18,6 +18,7 @@ SQLITE_FILE = Path(r"C:\Metabase\data\visualizacao.sqlite")
 LOCK_FILE = BASE_DIR / "Operacoes_atualizacao.lock"
 LOCK_MAX_MIN = 45        # trava mais antiga que isto e de uma rodada que morreu: e ignorada
 ABERTURA_MERCADO = (9, 35)  # dia util depois disto (hora de Nova York) a Stocks_Ind tem de ter o pregao de hoje
+DIAS_STOCKS_SQLITE = 10  # sincronizacao final: pregoes da Stocks_Ind regravados no SQLite (Atualizar_Stocks_Ind mexe nos ultimos 5)
 
 SCRIPTS = [
     "Atualizar_Stocks_Ind.py",
@@ -118,12 +119,7 @@ def sincronizar_metabase_sqlite():
         """).fetchdf()
         df_oper_abertas.to_sql("oper_abertas", con_sqlite, if_exists="replace", index=False)
 
-        df_stocks_ind = con_duck.execute("""
-            SELECT *
-            FROM Stocks_Ind
-            ORDER BY ticker, CAST(data AS VARCHAR)
-        """).fetchdf()
-        df_stocks_ind.to_sql("Stocks_Ind", con_sqlite, if_exists="replace", index=False)
+        linhas_stocks, modo_stocks = sincronizar_stocks_ind(con_duck, con_sqlite)
 
         df_evolucao = con_duck.execute("""
             SELECT *
@@ -134,12 +130,43 @@ def sincronizar_metabase_sqlite():
 
         log(
             f"SQLite Metabase sincronizado: {len(df_oper_abertas)} linhas em oper_abertas, "
-            f"{len(df_stocks_ind)} linhas em Stocks_Ind e "
+            f"{linhas_stocks} linhas em Stocks_Ind ({modo_stocks}) e "
             f"{len(df_evolucao)} linhas em Evolucao"
         )
+    except Exception as e:
+        log(f"ERRO na sincronizacao do SQLite Metabase: {e}")
+        raise
     finally:
         con_sqlite.close()
         con_duck.close()
+
+
+def sincronizar_stocks_ind(con_duck, con_sqlite):
+    """Stocks_Ind no SQLite: regrava so os ultimos DIAS_STOCKS_SQLITE pregoes (numa transacao).
+
+    A tabela inteira (~210 mil linhas) so e regravada se faltar no SQLite, se as colunas mudarem ou se a contagem
+    final nao bater com a DuckDB (ex.: ticker novo com historico). Menos escrita = menos risco com o Metabase
+    (Docker) a ler o arquivo durante a gravacao.
+    """
+    colunas = [r[0] for r in con_duck.execute("DESCRIBE Stocks_Ind").fetchall()]
+    colunas_sqlite = [r[1] for r in con_sqlite.execute("PRAGMA table_info('Stocks_Ind')").fetchall()]
+    total = con_duck.execute("SELECT count(*) FROM Stocks_Ind").fetchone()[0]
+    if colunas_sqlite == colunas:
+        desde = con_duck.execute(
+            f"""SELECT MIN(d) FROM (SELECT DISTINCT CAST(data AS VARCHAR) AS d FROM Stocks_Ind
+                ORDER BY d DESC LIMIT {DIAS_STOCKS_SQLITE})"""
+        ).fetchone()[0]
+        df = con_duck.execute(
+            "SELECT * FROM Stocks_Ind WHERE CAST(data AS VARCHAR) >= ? ORDER BY ticker, CAST(data AS VARCHAR)", [desde]
+        ).fetchdf()
+        con_sqlite.execute("DELETE FROM Stocks_Ind WHERE CAST(data AS TEXT) >= ?", [desde])
+        df.to_sql("Stocks_Ind", con_sqlite, if_exists="append", index=False)  # commita o DELETE junto
+        if con_sqlite.execute("SELECT count(*) FROM Stocks_Ind").fetchone()[0] == total:
+            return len(df), f"desde {desde}"
+
+    df = con_duck.execute("SELECT * FROM Stocks_Ind ORDER BY ticker, CAST(data AS VARCHAR)").fetchdf()
+    df.to_sql("Stocks_Ind", con_sqlite, if_exists="replace", index=False)
+    return len(df), "tabela inteira"
 
 def processo_vivo(pid):
     """True se o processo pid ainda existe (Windows); na duvida devolve True."""
