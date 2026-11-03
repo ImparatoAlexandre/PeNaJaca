@@ -5,10 +5,11 @@ import sys
 import duckdb
 import pandas as pd
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 
 DB_FILE = r"C:\BD\Stocks.duckdb"
 LOG_FILE = r"C:\DataMarket\FINAL_STATUS.txt"
+DIAS_PENDENTES = 45
 
 
 def pedir_data(nome):
@@ -155,14 +156,43 @@ def main():
 
     con = duckdb.connect(DB_FILE, config={"memory_limit": "2GB"})
 
-    fase1 = con.execute(
+    # alem dos sinais do periodo: grupos ainda sem operacao e grupos com ultima linha no periodo (close parcial),
+    # com sinal ate DIAS_PENDENTES dias antes de ATE
+    data_limite = (datetime.strptime(data_ate, "%Y%m%d") - timedelta(days=DIAS_PENDENTES)).strftime("%Y%m%d")
+    tem_fase2 = con.execute(
+        "SELECT count(*) FROM information_schema.tables WHERE table_name = 'oper_fase2'"
+    ).fetchone()[0] > 0
+    pendentes = (
         """
-        SELECT *
-        FROM oper_fase1
-        WHERE data BETWEEN ? AND ?
-        ORDER BY data, ticker, Stock_ID
+        OR (
+            CAST(o.data AS VARCHAR) BETWEEN ? AND ?
+            AND (g.fase1_id IS NULL OR NOT g.tem_operacao OR g.ultima_data >= ?)
+        )
+        """
+        if tem_fase2 else ""
+    )
+    grupos_fase2 = (
+        """
+        LEFT JOIN (
+            SELECT fase1_id,
+                   bool_or(lower(trim(status)) = 'operacao') AS tem_operacao,
+                   max(CAST(data AS VARCHAR)) AS ultima_data
+            FROM oper_fase2
+            GROUP BY fase1_id
+        ) g ON g.fase1_id = o.Stock_ID
+        """
+        if tem_fase2 else ""
+    )
+    fase1 = con.execute(
+        f"""
+        SELECT o.*
+        FROM oper_fase1 o
+        {grupos_fase2}
+        WHERE CAST(o.data AS VARCHAR) BETWEEN ? AND ?
+        {pendentes}
+        ORDER BY o.data, o.ticker, o.Stock_ID
         """,
-        [data_de, data_ate],
+        [data_de, data_ate] + ([data_limite, data_ate, data_de] if tem_fase2 else []),
     ).fetchdf()
 
     grupos = []
