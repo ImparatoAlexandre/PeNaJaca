@@ -153,7 +153,7 @@ def main():
     if data_de > data_ate:
         raise ValueError("DE nao pode ser maior que ATE.")
 
-    con = duckdb.connect(DB_FILE)
+    con = duckdb.connect(DB_FILE, config={"memory_limit": "2GB"})
 
     fase1 = con.execute(
         """

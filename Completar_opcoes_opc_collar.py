@@ -81,7 +81,7 @@ def main():
     simular = "--simular" in sys.argv
     for passe in range(1, PASSES + 1):
         correr_opc_collar()
-        con = duckdb.connect(DB_FILE, read_only=simular)
+        con = duckdb.connect(DB_FILE, read_only=simular, config={"memory_limit": "2GB"})
         f = faltas(con, desde)
         print(f"Passe {passe}: {len(f)} falta(s) " + str(f.etapa.value_counts().to_dict()))
         novas = gerar(con, f) if not f.empty else pd.DataFrame()

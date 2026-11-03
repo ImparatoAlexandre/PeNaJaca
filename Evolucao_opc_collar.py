@@ -78,10 +78,10 @@ def registrar_funcoes(con):
 
 
 def criar_tabela(con):
-    con.execute(f"DROP TABLE IF EXISTS {TABELA_DESTINO}")
+    # CREATE OR REPLACE (sem DROP antes): se a criacao falhar (ex.: falta de memoria), a tabela antiga fica
     con.execute(
         f"""
-        CREATE TABLE {TABELA_DESTINO} AS
+        CREATE OR REPLACE TABLE {TABELA_DESTINO} AS
         WITH operacoes AS (
             SELECT DISTINCT
                 op.Stock_ID AS oper_stock_id,
@@ -1092,7 +1092,7 @@ def preencher_etapa3_faltante(con):
 
 
 def main():
-    con = duckdb.connect(DB_FILE)
+    con = duckdb.connect(DB_FILE, config={"memory_limit": "2GB"})
     registrar_funcoes(con)
     criar_tabela(con)
     preencher_puts_faltantes(con)

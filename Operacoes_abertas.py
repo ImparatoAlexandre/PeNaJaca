@@ -138,7 +138,7 @@ def tickers_travados(con, data_operacao):
 def main(data_operacao=None, exportar=True, travar=True):
     """data_operacao: data a processar (None = ultima). exportar=False: nao exporta para o Metabase nem escreve o log (reprocessamento).
     travar=False: regrava tambem os fase2 do dia ja visiveis (sem manter close e hora da 1.a selecao)."""
-    con = duckdb.connect(DB_FILE)
+    con = duckdb.connect(DB_FILE, config={"memory_limit": "2GB"})
     agora = datetime.now()
     hora_execucao = agora.strftime("%H%M")
     hora_minuto = agora.strftime("%H:%M")

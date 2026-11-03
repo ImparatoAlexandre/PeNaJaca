@@ -18,7 +18,7 @@ TABELAS = ["Stocks_extremos_var2", "Stocks_Ind_backup_y_estimado", "stocks_ind_b
 def main():
     if LOCK_FILE.exists():
         sys.exit(f"Rodada em curso ({LOCK_FILE.name} existe) - nada apagado")
-    con = duckdb.connect(DB_FILE)
+    con = duckdb.connect(DB_FILE, config={"memory_limit": "2GB"})
     try:
         existentes = {r[0].lower() for r in con.execute("SELECT table_name FROM duckdb_tables()").fetchall()}
         for t in TABELAS:

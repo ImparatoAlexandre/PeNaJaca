@@ -130,7 +130,7 @@ def main():
     if sinais.empty:
         print("Nenhum sinal sem opcoes.")
         return
-    con = duckdb.connect(DB_FILE, read_only=simular)
+    con = duckdb.connect(DB_FILE, read_only=simular, config={"memory_limit": "2GB"})
     lista = ",".join(f"'{t}'" for t in sinais.ticker.unique())
     px = con.execute(
         f"SELECT trim(ticker) AS t, CAST(data AS VARCHAR) AS d, TRY_CAST(close AS DOUBLE) AS c FROM Stocks_Ind "

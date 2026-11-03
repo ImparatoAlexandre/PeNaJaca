@@ -25,7 +25,7 @@ def main():
         print(__doc__)
         return
     data_de, data_ate = sys.argv[1], sys.argv[2]
-    con = duckdb.connect(DB_FILE, read_only=True)
+    con = duckdb.connect(DB_FILE, read_only=True, config={"memory_limit": "2GB"})
     datas = [r[0] for r in con.execute(
         "SELECT DISTINCT data FROM Stocks_Ind WHERE CAST(data AS VARCHAR) BETWEEN ? AND ? ORDER BY 1",
         [data_de, data_ate]).fetchall()]
@@ -41,7 +41,7 @@ def main():
                 fase2.main(d, exportar=False, travar=False)
         print(d, flush=True)
 
-    con = duckdb.connect(DB_FILE)
+    con = duckdb.connect(DB_FILE, config={"memory_limit": "2GB"})
     resumo = con.execute(
         """
         SELECT estrategia, count(DISTINCT CAST(data_operacao AS VARCHAR) || ticker)

@@ -134,7 +134,7 @@ def sincronizar_sqlite(df, df_hist):
 
 
 def main():
-    con = duckdb.connect(DB_FILE)
+    con = duckdb.connect(DB_FILE, config={"memory_limit": "2GB"})
     try:
         df, df_hist = construir(con)
     finally:

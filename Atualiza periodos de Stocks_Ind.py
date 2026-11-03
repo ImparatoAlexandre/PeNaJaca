@@ -272,7 +272,7 @@ final_db = final.copy()
 if "Stock_ID" in final_db.columns:
     final_db = final_db[final_db["Stock_ID"].notna()].copy()
     final_db = final_db[db_cols]
-    con = duckdb.connect(DB_FILE)
+    con = duckdb.connect(DB_FILE, config={"memory_limit": "2GB"})
     con.register("final_db", final_db)
     con.execute("DELETE FROM Stocks_Ind WHERE data >= ? AND data <= ?", [DATA_INICIO, DATA_FIM])
     con.execute("INSERT INTO Stocks_Ind BY NAME SELECT * FROM final_db")

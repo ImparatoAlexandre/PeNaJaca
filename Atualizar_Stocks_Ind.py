@@ -386,7 +386,7 @@ resultados = []
 sem_yahoo = []  # tickers sem nenhum dado do Yahoo (lote e fallback individual)
 stocks_para_processar = list(dict.fromkeys(stocks))
 
-con_hist = duckdb.connect(DB_FILE)
+con_hist = duckdb.connect(DB_FILE, config={"memory_limit": "2GB"})
 historico_salvo_por_ticker = carregar_historico_salvo(con_hist, stocks_para_processar, CALC_LOOKBACK)
 con_hist.close()
 print(f"Historico salvo carregado de Stocks_Ind: {len(historico_salvo_por_ticker)} ativos", flush=True)
@@ -419,7 +419,7 @@ final_db = final.copy()
 if "Stock_ID" in final_db.columns:
     final_db = final_db[final_db["Stock_ID"].notna()].copy()
     final_db = final_db[db_cols]
-    con = duckdb.connect(DB_FILE)
+    con = duckdb.connect(DB_FILE, config={"memory_limit": "2GB"})
     con.execute('ALTER TABLE Stocks_Ind ADD COLUMN IF NOT EXISTS "MM50" DOUBLE')
     con.execute('ALTER TABLE Stocks_Ind ADD COLUMN IF NOT EXISTS "dist_MM50%" DOUBLE')
     for col in ("MOM5", "MOM10", "MOM20", "MME5", "MME10", "MME20"):

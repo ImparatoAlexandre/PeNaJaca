@@ -337,7 +337,7 @@ def main():
     hoje = datetime.now()
     data_registro = ymd(hoje)
 
-    con = duckdb.connect(DB_FILE)
+    con = duckdb.connect(DB_FILE, config={"memory_limit": "2GB"})
     garantir_tabela(con)
 
     tickers = tickers_liquidez(con)

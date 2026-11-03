@@ -120,7 +120,7 @@ def sincronizar_sqlite(df):
 
 
 def main():
-    con = duckdb.connect(DB_FILE)
+    con = duckdb.connect(DB_FILE, config={"memory_limit": "2GB"})
     try:
         df = construir(con)
     finally:

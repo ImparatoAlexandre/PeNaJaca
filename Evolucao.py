@@ -159,7 +159,7 @@ def sincronizar_sqlite(df):
 
 def main():
     print(f"{datetime.now()} -> INICIO Evolucao.py")
-    con = duckdb.connect(str(DB_FILE))
+    con = duckdb.connect(str(DB_FILE), config={"memory_limit": "2GB"})
     try:
         con.execute(QUERY_EVOLUCAO)
         df = con.execute(f"SELECT * FROM {TABELA_SAIDA}").fetchdf()

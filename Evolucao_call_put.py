@@ -176,7 +176,7 @@ def resumo(df):
 
 
 def main():
-    con = duckdb.connect(DB_FILE)
+    con = duckdb.connect(DB_FILE, config={"memory_limit": "2GB"})
     df = construir(con)
     qtd = sincronizar_sqlite(con)
     print(f"Tabela {TABELA_DESTINO} criada com {qtd} linhas.")

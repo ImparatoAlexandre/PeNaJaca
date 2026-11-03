@@ -26,7 +26,7 @@ def main():
     dia = sys.argv[1]
     dia_hora = f"{dia[:4]}-{dia[4:6]}-{dia[6:]}%"
 
-    con = duckdb.connect(DB_FILE)
+    con = duckdb.connect(DB_FILE, config={"memory_limit": "2GB"})
     try:
         n_cp = con.execute("SELECT count(*) FROM Call_Put_dados WHERE DataRegistro = ?", [dia]).fetchone()[0]
         con.execute("DELETE FROM Call_Put_dados WHERE DataRegistro = ?", [dia])

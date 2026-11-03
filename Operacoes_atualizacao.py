@@ -56,7 +56,7 @@ def stocks_ind_atualizada_hoje():
     if not DB_FILE.exists():
         return False
 
-    con = duckdb.connect(str(DB_FILE), read_only=True)
+    con = duckdb.connect(str(DB_FILE), read_only=True, config={"memory_limit": "2GB"})
     try:
         ultima_data, tickers_hoje = con.execute(
             """
@@ -101,7 +101,7 @@ def sincronizar_metabase_sqlite():
     """Atualiza o SQLite usado pelo Metabase com as tabelas principais."""
     SQLITE_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-    con_duck = duckdb.connect(str(DB_FILE), read_only=True)
+    con_duck = duckdb.connect(str(DB_FILE), read_only=True, config={"memory_limit": "2GB"})
     con_sqlite = sqlite3.connect(str(SQLITE_FILE))
     try:
         df_oper_abertas = con_duck.execute("""

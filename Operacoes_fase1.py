@@ -107,7 +107,7 @@ def gravar_oper_fase1(con, operacoes_df):
 
 
 def main():
-    con = duckdb.connect(DB_FILE)
+    con = duckdb.connect(DB_FILE, config={"memory_limit": "2GB"})
 
     try:
         operacoes_df = buscar_operacoes(con)

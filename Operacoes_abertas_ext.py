@@ -200,7 +200,7 @@ def limpar_ext_dia(con, data_operacao, travar):
 def main(data_operacao=None, exportar=True, travar=True):
     """data_operacao: data a processar (None = ultima). exportar=False: nao exporta para o Metabase nem escreve o log (reprocessamento).
     travar=False: refaz todos os ext do dia (sem manter os ja visiveis)."""
-    con = duckdb.connect(DB_FILE)
+    con = duckdb.connect(DB_FILE, config={"memory_limit": "2GB"})
     agora = datetime.now()
     hora_execucao = agora.strftime("%H%M")
     hora_minuto = agora.strftime("%H:%M")

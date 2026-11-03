@@ -346,7 +346,7 @@ def resumo(df):
 
 
 def main():
-    con = duckdb.connect(DB_FILE)
+    con = duckdb.connect(DB_FILE, config={"memory_limit": "2GB"})
     df = construir(con)
     construir_volatilidade(con)
     qtd = sincronizar_sqlite(con)
