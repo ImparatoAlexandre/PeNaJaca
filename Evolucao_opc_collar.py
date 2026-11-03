@@ -1,5 +1,6 @@
 ﻿import math
 import sqlite3
+import sys
 from datetime import date, datetime, timedelta
 from statistics import NormalDist
 
@@ -12,6 +13,11 @@ DB_FILE = r"C:\BD\Stocks.duckdb"
 SQLITE_FILE = r"C:\Metabase\data\visualizacao.sqlite"
 
 TABELA_DESTINO = "Evolucao_opc_collar"
+# Incremental: 1.a execucao do dia (ou --completo) reconstroi tudo; nas seguintes so se recalculam sinais novos, operacoes
+# abertas e as com put vencida (ou sem put) ha <= MARGEM_DIAS_FIXA dias; as restantes ficam como estao (resultado fixo).
+TABELA_CONTROLE = "Evolucao_opc_collar_controle"   # data da ultima reconstrucao completa
+TABELA_PARCIAL = "Evolucao_opc_collar_parcial"     # tabela de trabalho do modo incremental
+MARGEM_DIAS_FIXA = 10
 MAX_DIAS_ENTRE_OPERACAO_E_OPCAO = 3
 DIAS_UTEIS_MINIMOS_VENCIMENTO = 8
 
@@ -77,11 +83,16 @@ def registrar_funcoes(con):
     )
 
 
-def criar_tabela(con):
-    # CREATE OR REPLACE (sem DROP antes): se a criacao falhar (ex.: falta de memoria), a tabela antiga fica
+def criar_tabela(con, tabela=TABELA_DESTINO, so_alvo=False):
+    # CREATE OR REPLACE (sem DROP antes): se a criacao falhar (ex.: falta de memoria), a tabela antiga fica.
+    # so_alvo: so as operacoes da tabela temporaria ops_alvo (modo incremental).
+    filtro_alvo = (
+        "AND EXISTS (SELECT 1 FROM ops_alvo a WHERE a.dataoperacao = CAST(op.data_operacao AS VARCHAR) AND a.ticker = trim(op.ticker))"
+        if so_alvo else ""
+    )
     con.execute(
         f"""
-        CREATE OR REPLACE TABLE {TABELA_DESTINO} AS
+        CREATE OR REPLACE TABLE {tabela} AS
         WITH operacoes AS (
             SELECT DISTINCT
                 op.Stock_ID AS oper_stock_id,
@@ -95,6 +106,7 @@ def criar_tabela(con):
                 ON trim(l.ticker) = trim(op.ticker)
             WHERE TRY_CAST(op.dia_hist AS INTEGER) = 1
               AND l.liquidez_classificacao IN ('Alta', 'Muito alta')
+              {filtro_alvo}
         ),
         opcoes_base AS (
             SELECT
@@ -351,6 +363,7 @@ def criar_tabela(con):
                     MAX(TRY_CAST(lastPrice AS DOUBLE)) AS lastPrice,
                     MAX(TRY_CAST(impliedVolatility AS DOUBLE)) AS iv
                 FROM Call_Put_dados
+                WHERE upper(trim(ticker)) IN (SELECT DISTINCT upper(ticker) FROM operacoes)
                 GROUP BY
                     ticker,
                     tipo,
@@ -373,6 +386,7 @@ def criar_tabela(con):
                     MAX(TRY_CAST(lastPrice AS DOUBLE)) AS lastPrice,
                     MAX(TRY_CAST(impliedVolatility AS DOUBLE)) AS iv
                 FROM Call_Put_dados
+                WHERE upper(trim(ticker)) IN (SELECT DISTINCT upper(ticker) FROM operacoes)
                 GROUP BY
                     ticker,
                     tipo,
@@ -513,7 +527,7 @@ def criar_tabela(con):
     )
 
 
-def preencher_retorno_sem_etapa3(con):
+def preencher_retorno_sem_etapa3(con, tabela=TABELA_DESTINO):
     """Preenche retorno (e entrada_* / saida_*) das operacoes sem etapa 3 cuja put ja venceu.
 
     Sem etapa 2: so ha a put; retorno = (valor da put no vencimento - premio) / close_oper.
@@ -526,7 +540,7 @@ def preencher_retorno_sem_etapa3(con):
         SELECT d.dataoperacao, d.ticker, d.close_oper, d.strike_put, d.valor_put, CAST(d.venc_put AS DATE) AS venc,
                d."ETAPA_2_data" AS e2, d."MIN_etapa2" AS min_e2, d.strike_call, d.valor_call,
                s.close AS close_venc
-        FROM {TABELA_DESTINO} d
+        FROM {tabela} d
         JOIN LATERAL (
             SELECT TRY_CAST(close AS DOUBLE) AS close
             FROM Stocks_Ind
@@ -567,7 +581,7 @@ def preencher_retorno_sem_etapa3(con):
     con.register("df_sem_e3", df)
     con.execute(
         f"""
-        UPDATE {TABELA_DESTINO} AS d
+        UPDATE {tabela} AS d
         SET retorno = r.retorno,
             entrada_put = r.entrada_put,
             entrada_ativo = COALESCE(r.entrada_ativo, d.entrada_ativo),
@@ -588,7 +602,7 @@ def _dias_uteis_entre(inicio, fim):
     return max(int(np.busday_count(a, b)), 1)
 
 
-def calcular_retorno_realista(con):
+def calcular_retorno_realista(con, tabela=TABELA_DESTINO):
     """Acrescenta colunas com execucao realista e a variante com call OTM.
 
     retorno (atual) compra no Min e vende no Max do dia, o que nao e executavel.
@@ -602,7 +616,7 @@ def calcular_retorno_realista(con):
         f"""
         SELECT dataoperacao, ticker, close_oper, strike_put, valor_put, venc_put, vol_put,
                "ETAPA_2_data" AS e2, strike_call, valor_call, "ETAPA3_data" AS e3
-        FROM {TABELA_DESTINO}
+        FROM {tabela}
         WHERE strike_put IS NOT NULL
         """
     ).fetchdf()
@@ -740,9 +754,9 @@ def calcular_retorno_realista(con):
     con.register("df_realista", df)
     con.execute(
         f"""
-        CREATE OR REPLACE TABLE {TABELA_DESTINO} AS
+        CREATE OR REPLACE TABLE {tabela} AS
         SELECT d.*, r.* EXCLUDE (dataoperacao, ticker)
-        FROM {TABELA_DESTINO} d
+        FROM {tabela} d
         LEFT JOIN df_realista r USING (dataoperacao, ticker)
         ORDER BY d.dataoperacao DESC, d.ticker
         """
@@ -760,7 +774,7 @@ def sincronizar_sqlite(con):
     return len(df)
 
 
-def preencher_puts_faltantes(con):
+def preencher_puts_faltantes(con, tabela=TABELA_DESTINO):
     con.execute(
         f"""
         WITH operacoes AS (
@@ -774,7 +788,7 @@ def preencher_puts_faltantes(con):
             FROM oper_abertas AS op
             INNER JOIN Stocks_OPC_liquidez AS l
                 ON trim(l.ticker) = trim(op.ticker)
-            INNER JOIN {TABELA_DESTINO} AS destino
+            INNER JOIN {tabela} AS destino
                 ON destino.dataoperacao = CAST(op.data_operacao AS VARCHAR)
                AND upper(trim(destino.ticker)) = upper(trim(op.ticker))
             WHERE TRY_CAST(op.dia_hist AS INTEGER) = 1
@@ -901,7 +915,7 @@ def preencher_puts_faltantes(con):
             FROM puts_abaixo
             WHERE rn_abaixo_no_dinheiro = 4
         )
-        UPDATE {TABELA_DESTINO} AS destino
+        UPDATE {tabela} AS destino
         SET
             strike_put = ROUND(p.strike, 2),
             valor_put = ROUND(p.valor_put, 2),
@@ -918,7 +932,7 @@ def preencher_puts_faltantes(con):
     )
 
 
-def preencher_calls_faltantes(con):
+def preencher_calls_faltantes(con, tabela=TABELA_DESTINO):
     con.execute(
         f"""
         WITH calls_rank AS (
@@ -933,7 +947,7 @@ def preencher_calls_faltantes(con):
                         ABS(TRY_CAST(c.strike AS DOUBLE) - destino."MIN_etapa2"),
                         TRY_CAST(c.strike AS DOUBLE)
                 ) AS rn_call
-            FROM {TABELA_DESTINO} AS destino
+            FROM {tabela} AS destino
             INNER JOIN Call_Put_dados c
                 ON upper(trim(c.ticker)) = upper(trim(destino.ticker))
                AND upper(trim(c.tipo)) = 'CALL'
@@ -950,7 +964,7 @@ def preencher_calls_faltantes(con):
             FROM calls_rank
             WHERE rn_call = 1
         )
-        UPDATE {TABELA_DESTINO} AS destino
+        UPDATE {tabela} AS destino
         SET
             strike_call = ROUND(c.strike_call, 2),
             valor_call = ROUND(c.valor_call, 2)
@@ -962,7 +976,7 @@ def preencher_calls_faltantes(con):
     )
 
 
-def preencher_etapa3_faltante(con):
+def preencher_etapa3_faltante(con, tabela=TABELA_DESTINO):
     con.execute(
         f"""
         WITH etapa3_raw AS (
@@ -986,7 +1000,7 @@ def preencher_etapa3_faltante(con):
                     PARTITION BY destino.dataoperacao, upper(trim(destino.ticker))
                     ORDER BY CAST(s.data AS VARCHAR) ASC
                 ) AS rn_ultima_etapa3
-            FROM {TABELA_DESTINO} AS destino
+            FROM {tabela} AS destino
             INNER JOIN Stocks_Ind s
                 ON upper(trim(s.ticker)) = upper(trim(destino.ticker))
                AND CAST(s.data AS VARCHAR) > destino."ETAPA_2_data"
@@ -1002,6 +1016,7 @@ def preencher_etapa3_faltante(con):
                     MAX(TRY_CAST(lastPrice AS DOUBLE)) AS lastPrice,
                     MAX(TRY_CAST(impliedVolatility AS DOUBLE)) AS iv
                 FROM Call_Put_dados
+                WHERE upper(trim(ticker)) IN (SELECT DISTINCT upper(trim(ticker)) FROM {tabela})
                 GROUP BY
                     ticker,
                     tipo,
@@ -1024,6 +1039,7 @@ def preencher_etapa3_faltante(con):
                     MAX(TRY_CAST(lastPrice AS DOUBLE)) AS lastPrice,
                     MAX(TRY_CAST(impliedVolatility AS DOUBLE)) AS iv
                 FROM Call_Put_dados
+                WHERE upper(trim(ticker)) IN (SELECT DISTINCT upper(trim(ticker)) FROM {tabela})
                 GROUP BY
                     ticker,
                     tipo,
@@ -1066,12 +1082,12 @@ def preencher_etapa3_faltante(con):
                     2
                 ) AS retorno
             FROM etapa3_raw r
-            INNER JOIN {TABELA_DESTINO} destino
+            INNER JOIN {tabela} destino
                 ON destino.dataoperacao = r.dataoperacao
                AND upper(trim(destino.ticker)) = upper(trim(r.ticker))
             WHERE rn_ultima_etapa3 = 1
         )
-        UPDATE {TABELA_DESTINO} AS destino
+        UPDATE {tabela} AS destino
         SET
             "ETAPA3_data" = e.data_evolucao,
             "var_MAX_ativo" = e.variacao_pct,
@@ -1091,18 +1107,93 @@ def preencher_etapa3_faltante(con):
     )
 
 
-def main():
+def calcular(con, tabela, so_alvo=False):
+    criar_tabela(con, tabela, so_alvo)
+    preencher_puts_faltantes(con, tabela)
+    preencher_calls_faltantes(con, tabela)
+    preencher_etapa3_faltante(con, tabela)
+    preencher_retorno_sem_etapa3(con, tabela)
+    calcular_retorno_realista(con, tabela)
+
+
+def completa_feita_hoje(con, hoje):
+    existentes = {r[0] for r in con.execute("SELECT table_name FROM duckdb_tables()").fetchall()}
+    if TABELA_DESTINO not in existentes or TABELA_CONTROLE not in existentes:
+        return False
+    return con.execute(f"SELECT max(ultima_completa) FROM {TABELA_CONTROLE}").fetchone()[0] == hoje
+
+
+def marcar_alvo(con):
+    """ops_alvo = operacoes a recalcular (sinais novos, abertas e put vencida ha <= MARGEM_DIAS_FIXA dias);
+    ops_fixas = operacoes ja na tabela com resultado fixo (put vencida, ou sem put, ha mais de MARGEM_DIAS_FIXA dias)."""
+    con.execute(
+        f"""
+        CREATE OR REPLACE TEMP TABLE ops_fixas AS
+        SELECT dataoperacao, ticker
+        FROM {TABELA_DESTINO}
+        GROUP BY dataoperacao, ticker
+        HAVING bool_and(CASE WHEN venc_put IS NOT NULL
+                             THEN CAST(venc_put AS DATE) < current_date - {MARGEM_DIAS_FIXA}
+                             ELSE strptime(dataoperacao, '%Y%m%d') < current_date - {MARGEM_DIAS_FIXA} END)
+        """
+    )
+    con.execute(
+        """
+        CREATE OR REPLACE TEMP TABLE ops_alvo AS
+        SELECT DISTINCT CAST(op.data_operacao AS VARCHAR) AS dataoperacao, trim(op.ticker) AS ticker
+        FROM oper_abertas AS op
+        INNER JOIN Stocks_OPC_liquidez AS l ON trim(l.ticker) = trim(op.ticker)
+        WHERE TRY_CAST(op.dia_hist AS INTEGER) = 1
+          AND l.liquidez_classificacao IN ('Alta', 'Muito alta')
+          AND NOT EXISTS (SELECT 1 FROM ops_fixas f
+                          WHERE f.dataoperacao = CAST(op.data_operacao AS VARCHAR) AND f.ticker = trim(op.ticker))
+        """
+    )
+    return con.execute("SELECT count(*) FROM ops_alvo").fetchone()[0], con.execute("SELECT count(*) FROM ops_fixas").fetchone()[0]
+
+
+def juntar_parcial(con):
+    """Tabela final = linhas fixas + operacoes recalculadas (colunas e tipos da tabela final)."""
+    tipos = con.execute(f"DESCRIBE {TABELA_DESTINO}").fetchall()
+    parcial = {r[0] for r in con.execute(f"DESCRIBE {TABELA_PARCIAL}").fetchall()}
+    sel = ", ".join(
+        f'CAST(p."{nome}" AS {tipo}) AS "{nome}"' if nome in parcial else f'CAST(NULL AS {tipo}) AS "{nome}"'
+        for nome, tipo, *_ in tipos
+    )
+    con.execute(
+        f"""
+        CREATE OR REPLACE TABLE {TABELA_DESTINO} AS
+        SELECT * FROM (
+            SELECT d.* FROM {TABELA_DESTINO} d
+            WHERE EXISTS (SELECT 1 FROM ops_fixas f WHERE f.dataoperacao = d.dataoperacao AND f.ticker = d.ticker)
+            UNION ALL
+            SELECT {sel} FROM {TABELA_PARCIAL} p
+        )
+        ORDER BY dataoperacao DESC, ticker
+        """
+    )
+    con.execute(f"DROP TABLE {TABELA_PARCIAL}")
+
+
+def main(completo=None):
+    """completo=None: reconstroi tudo na 1.a execucao do dia (ou com --completo); nas seguintes, incremental."""
     con = duckdb.connect(DB_FILE, config={"memory_limit": "2GB"})
     registrar_funcoes(con)
-    criar_tabela(con)
-    preencher_puts_faltantes(con)
-    preencher_calls_faltantes(con)
-    preencher_etapa3_faltante(con)
-    preencher_retorno_sem_etapa3(con)
-    calcular_retorno_realista(con)
+    hoje = datetime.now().strftime("%Y%m%d")
+    if completo is None:
+        completo = "--completo" in sys.argv or not completa_feita_hoje(con, hoje)
+    if completo:
+        calcular(con, TABELA_DESTINO)
+        con.execute(f"CREATE OR REPLACE TABLE {TABELA_CONTROLE} AS SELECT '{hoje}' AS ultima_completa")
+        modo = "completa"
+    else:
+        n_alvo, n_fixas = marcar_alvo(con)
+        calcular(con, TABELA_PARCIAL, so_alvo=True)
+        juntar_parcial(con)
+        modo = f"incremental: {n_alvo} operacoes recalculadas, {n_fixas} fixas"
     qtd = sincronizar_sqlite(con)
 
-    print(f"Tabela {TABELA_DESTINO} criada com {qtd} linhas.")
+    print(f"Tabela {TABELA_DESTINO} criada com {qtd} linhas ({modo}).")
     print(
         con.execute(
             f"""

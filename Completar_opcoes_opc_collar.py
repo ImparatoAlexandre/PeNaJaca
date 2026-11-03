@@ -73,7 +73,7 @@ def gerar(con, f):
 
 def correr_opc_collar():
     with contextlib.redirect_stdout(io.StringIO()):
-        opc_collar.main()
+        opc_collar.main(completo=True)
 
 
 def main():
