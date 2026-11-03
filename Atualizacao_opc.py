@@ -302,15 +302,33 @@ def inserir_linhas(con, linhas, data_registro: str):
     return len(df)
 
 
-def sincronizar_sqlite(con):
+def sincronizar_sqlite(con, data_registro):
+    """SQLite do Metabase: troca so a recolha do dia e tira a que passou dos DIAS_SQLITE dias (numa transacao).
+
+    So esta rodada mexe em dias reais (as linhas _BS dos Completar_* nao vao para o SQLite), por isso os dias
+    anteriores ja estao certos. A tabela inteira so e regravada se faltar, se as colunas mudarem ou se a contagem
+    final nao bater com a DuckDB. Menos escrita = menos risco com o Metabase (Docker) a ler o arquivo.
+    """
     desde = ymd(datetime.now() - timedelta(days=DIAS_SQLITE))
-    df = con.execute(
-        f"SELECT * FROM {TABELA_OPC} WHERE DataRegistro >= ? AND ID NOT LIKE '%\\_BS' ESCAPE '\\' ORDER BY DataRegistro, ID",
-        [desde],
-    ).fetchdf()
+    reais = "ID NOT LIKE '%\\_BS' ESCAPE '\\'"
+    colunas = [r[0] for r in con.execute(f"DESCRIBE {TABELA_OPC}").fetchall()]
+    total = con.execute(f"SELECT count(*) FROM {TABELA_OPC} WHERE DataRegistro >= ? AND {reais}", [desde]).fetchone()[0]
     sq = sqlite3.connect(SQLITE_FILE)
     try:
+        if [r[1] for r in sq.execute(f"PRAGMA table_info('{TABELA_OPC}')").fetchall()] == colunas:
+            df = con.execute(
+                f"SELECT * FROM {TABELA_OPC} WHERE DataRegistro = ? AND {reais} ORDER BY ID", [data_registro]
+            ).fetchdf()
+            sq.execute(f"DELETE FROM {TABELA_OPC} WHERE DataRegistro = ? OR DataRegistro < ?", [data_registro, desde])
+            df.to_sql(TABELA_OPC, sq, if_exists="append", index=False)
+            sq.commit()  # o DELETE tambem, mesmo sem linhas novas
+            if sq.execute(f"SELECT count(*) FROM {TABELA_OPC}").fetchone()[0] == total:
+                return f"{len(df)} linhas do dia {data_registro}"
+        df = con.execute(
+            f"SELECT * FROM {TABELA_OPC} WHERE DataRegistro >= ? AND {reais} ORDER BY DataRegistro, ID", [desde]
+        ).fetchdf()
         df.to_sql(TABELA_OPC, sq, if_exists="replace", index=False)
+        return f"tabela inteira ({len(df)} linhas)"
     finally:
         sq.close()
 
@@ -366,11 +384,11 @@ def main():
         print(f"[coleta {i}/{len(contratos_por_ticker)}] {ticker}: linhas={len(linhas)}")
 
     inseridas = inserir_linhas(con, todas_linhas, data_registro)
-    sincronizar_sqlite(con)
+    sincronizado = sincronizar_sqlite(con, data_registro)
     con.close()
 
     print(f"Linhas inseridas/atualizadas em {TABELA_OPC}: {inseridas}")
-    print("SQLite Metabase sincronizado.")
+    print(f"SQLite Metabase sincronizado: {sincronizado}.")
 
 
 if __name__ == "__main__":

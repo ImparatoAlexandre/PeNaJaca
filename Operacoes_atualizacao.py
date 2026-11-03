@@ -160,7 +160,8 @@ def sincronizar_stocks_ind(con_duck, con_sqlite):
             "SELECT * FROM Stocks_Ind WHERE CAST(data AS VARCHAR) >= ? ORDER BY ticker, CAST(data AS VARCHAR)", [desde]
         ).fetchdf()
         con_sqlite.execute("DELETE FROM Stocks_Ind WHERE CAST(data AS TEXT) >= ?", [desde])
-        df.to_sql("Stocks_Ind", con_sqlite, if_exists="append", index=False)  # commita o DELETE junto
+        df.to_sql("Stocks_Ind", con_sqlite, if_exists="append", index=False)
+        con_sqlite.commit()  # o DELETE tambem, mesmo sem linhas novas
         if con_sqlite.execute("SELECT count(*) FROM Stocks_Ind").fetchone()[0] == total:
             return len(df), f"desde {desde}"
 
