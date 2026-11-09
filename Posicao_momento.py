@@ -5,7 +5,7 @@ Opcoes   ultima captura do ticker em Call_Put_dados, mesmo tipo, vencimento e st
            valor = meio entre bid e ask (sem bid/ask: lastPrice); vol = impliedVolatility em %.
          Contrato fora da ultima captura do ticker (vencido ou sem coleta): valor e vol vazios.
 Retorno  retorno% no momento, vendendo agora as opcoes compradas na entrada (mesma conta do modelo):
-           call_put e vol_call_put = par 1 call + 1 put: (call_atual + put_atual) / (valor_call + valor_put) - 1;
+           etapa1 e etapa2 (antes call_put e vol_call_put) = par 1 call + 1 put: (call_atual + put_atual) / (valor_call + valor_put) - 1;
            stock = Var%ativo.
 Prazo    dias_vencimento = dias uteis da data da captura ate ao vencimento (como no modelo), minimo 0.
 Grava    tabela Posicao_momento na DuckDB e no SQLite do Metabase (substituida a cada execucao).
@@ -98,7 +98,7 @@ def construir(con):
     ops["data_captura"] = ops.ticker.str.strip().str.upper().map(capturas).fillna(ops.data_preco)
     ops["Var%ativo"] = ((ops.close_atual / ops.close_oper - 1) * 100).round(2)
     ret_call_put = (ops.valor_call_atual + ops.valor_put_atual) / (ops.valor_call + ops.valor_put) - 1
-    ops["retorno%"] = np.where(ops.modelo.isin(["call_put", "vol_call_put"]), ret_call_put * 100, ops["Var%ativo"]).round(2)
+    ops["retorno%"] = np.where(ops.modelo.isin(["etapa1", "etapa2", "call_put", "vol_call_put"]), ret_call_put * 100, ops["Var%ativo"]).round(2)
 
     venc = pd.to_datetime(ops.venc_put, errors="coerce")
     captura = pd.to_datetime(ops.data_captura, format="%Y%m%d", errors="coerce")

@@ -1,4 +1,5 @@
-"""Compra de call e put (delta 0.30 / -0.30) como o Evolucao_call_put, mas escolhe o par de menor volatilidade do dia.
+"""Etapa 2 (na view: modelo etapa2). Compra de call e put (delta 0.30 / -0.30) como o Evolucao_call_put, mas escolhe o
+par de menor volatilidade do dia, com alvo ALVO_PCT (±10%) e corte ao close do CORTE_DU.o dia de pregao (D5).
 
 Sinais   oper_abertas com estrategia = "ext" e ordem_selecao_dia <= ORDEM_MAX (3), com opcoes liquidas (Alta / Muito alta).
 Escolha  para cada sinal calcula as pernas de entrada do Evolucao_call_put (call delta 0.30 e put delta -0.30) e a IV de
@@ -25,6 +26,12 @@ ESTRATEGIA = "ext"
 ORDEM_MAX = 3
 VOL_MAX = 0.80  # IV da call ou da put acima disto: o par nao entra
 # 80% (era 60%) em 2026-10-24: grade 50%..sem limite, capital unico 77.5k -> 102k; pares de IV 80-100% rendem ~+4%, acima de 100% perdem
+ALVO_PCT = 0.10  # alvo de alta e de baixa no ativo
+CORTE_DU = 5     # sem alvo: sai ao close do 5.o dia de pregao apos a entrada (2026-11-08; antes ficava ate ao vencimento)
+
+
+def avaliar(op, px_t, opc_t, trava=None):
+    return cp.avaliar(op, px_t, opc_t, trava, alvo_pct=ALVO_PCT, corte_du=CORTE_DU)
 
 COLUNAS = cp.COLUNAS + ["vol_par", "candidatos"]
 
@@ -73,7 +80,7 @@ def construir(con):
     px = base.carregar_precos(con, ops.ticker.unique(), desde)
     opc = base.carregar_opcoes(con, ops.ticker.unique(), base.ymd(base.para_data(desde) - pd.Timedelta(days=base.DIAS_FALLBACK_CADEIA)))
     sel = escolher_pares(con, ops, opc).reset_index(drop=True)
-    df = base.avaliar_com_travas(con, MODELO, sel, cp.avaliar, px, opc)
+    df = base.avaliar_com_travas(con, MODELO, sel, avaliar, px, opc)
     df["vol_par"], df["candidatos"] = sel.vol_par.values, sel.candidatos.values
     df = cp.marcar_capital_unico(df).reindex(columns=COLUNAS)
     for col in ["hora", "estrategia", "venc_put", "SAIDA_data", "status"]:
