@@ -1,7 +1,7 @@
 """Etapa 1 (na view: modelo etapa1). Compra de call e put (delta 0.30 / -0.30) com entrada no dia do sinal.
 
 Sinais   oper_abertas com estrategia = ESTRATEGIA ("ext") e ordem_selecao_dia <= ORDEM_MAX (1), com opcoes liquidas
-         (mesma selecao do Evolucao_stock). Fora: sinais com IV da call ou da put acima de VOL_MAX (80%).
+         (mesma selecao do Evolucao_stock). Fora: sinais com IV da call ou da put acima de VOL_MAX (70%).
 Entrada  no dia da operacao, ao close (close_oper), no 1.o vencimento aceite por base.venc_valido (sexta com >= 10 du):
            - compra o par 1 call (delta mais proximo de CALL_DELTA) + 1 put (delta mais proximo de PUT_DELTA),
              na mesma quantidade; VALOR_OPERACAO e aplicado no par.
@@ -36,7 +36,7 @@ CALL_DELTA = 0.30
 PUT_DELTA = -0.30
 ALVO_PCT = 0.07      # alvo de alta e de baixa no ativo (era 0.10 ate 2026-11-08)
 CORTE_DU = 7         # sem alvo: sai ao close do 7.o dia de pregao apos a entrada (None = ate ao vencimento)
-VOL_MAX = 0.80       # IV da call ou da put acima disto: o sinal nao entra (mesma regra do vol_call_put)
+VOL_MAX = 0.70       # IV da call ou da put acima disto: o sinal nao entra (2026-11-08: 80% -> 70%, mesmo lucro com metade das perdas)
 VALOR_OPERACAO = 5000
 STATUS_FECHADAS = ["alvo_alta", "alvo_baixa", "corte", "vencimento"]
 

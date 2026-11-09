@@ -2,7 +2,7 @@
 -- Modelos:
 --   stock:        so o ativo, sinais e saidas da Evolucao_stock (alvo +10%, stop -4%), sem stop nem alvo vende no vencimento que a put teria
 --   etapa1:       (tabela Evolucao_call_put) compra call delta 0.30 e put delta -0.30 (1 call + 1 put, retorno do par), so sinais ext ordem 1,
---                 IV da call e da put <= 80%, sai quando o ativo toca +7% ou -7%, sem alvo sai ao close do D7 (status corte)
+--                 IV da call e da put <= 70%, sai quando o ativo toca +7% ou -7%, sem alvo sai ao close do D7 (status corte)
 --                 (alvo_saida = alvo de alta, stop_saida = alvo de baixa)
 --   etapa2:       (tabela Evolucao_vol_call_put) igual a etapa1, mas entre os sinais ext ordem 1 a 3 entra 1 par por dia, o de menor vol media (call + put) / 2,
 --                 sem par com IV da call ou da put acima de 80%, alvo +10% ou -10%, sem alvo sai ao close do D5 (status corte)

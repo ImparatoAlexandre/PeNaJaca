@@ -1,7 +1,7 @@
 -- Resultado por mes por modelo (tabelas Evolucao_stock, Evolucao_call_put = etapa1 e Evolucao_vol_call_put = etapa2)
 --   put_30:   ativo + put delta -0.30, alvo +10%, stop -4% no ativo, sem corte (fica ate ao vencimento da put)
 --   stock:    so o ativo (sem put), mesmos sinais, stop e alvo da put_30, sem stop nem alvo vende no vencimento que a put teria
---   etapa1:   compra call delta 0.30 e put delta -0.30 (1 call + 1 put, retorno do par), ext ordem 1, IV <= 80% por perna, ±7%, corte D7
+--   etapa1:   compra call delta 0.30 e put delta -0.30 (1 call + 1 put, retorno do par), ext ordem 1, IV <= 70% por perna, ±7%, corte D7
 --   etapa2:   igual, ext ordem 1-3 (par de menor vol do dia), IV <= 80% por perna, ±10%, corte D5
 -- Mes = mes da data da operacao. So operacoes fechadas.
 -- soma_todos        soma dos retornos de todos os sinais do mes
