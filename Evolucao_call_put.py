@@ -38,7 +38,8 @@ ALVO_PCT = 0.07      # alvo de alta e de baixa no ativo (era 0.10 ate 2026-11-08
 CORTE_DU = 7         # sem alvo: sai ao close do 7.o dia de pregao apos a entrada (None = ate ao vencimento)
 VOL_MAX = 0.75       # IV da call ou da put acima disto: o sinal nao entra (2026-11-08: 80% -> 70%; 2026-11-10: 70% -> 75%,
                      # +12 sinais, todos tocaram ±7%, 0 cortes, pior igual -25.7%, mediana +20.8% -> +15.5%)
-MAX_SIMULTANEAS = 2  # coluna selecionada_capital_2: ate 2 operacoes abertas ao mesmo tempo (capital ate 2 x VALOR_OPERACAO)
+# Todos os sinais ficam na tabela (tambem os que entram com outra operacao aberta); selecionada_capital_unico so marca
+# os que caberiam com uma operacao de cada vez.
 VALOR_OPERACAO = 5000
 STATUS_FECHADAS = ["alvo_alta", "alvo_baixa", "corte", "vencimento"]
 
@@ -46,7 +47,7 @@ COLUNAS = [
     "dataoperacao", "hora", "ticker", "estrategia", "close_oper", "ordem_selecao_dia",
     "strike_call", "valor_call", "vol_call", "strike_put", "valor_put", "vol_put", "venc_put", "dias_venc",
     "alvo_alta", "alvo_baixa", "SAIDA_data", "var_MAX_ativo", "var_MIN_ativo", "saida_ativo", "saida_call", "saida_put",
-    "status", "retorno", "lucro", "dias_capital", "selecionada_capital_unico", "selecionada_capital_2",
+    "status", "retorno", "lucro", "dias_capital", "selecionada_capital_unico",
 ]
 
 
@@ -166,21 +167,6 @@ def marcar_capital_unico(df):
             continue
         df.at[i, "selecionada_capital_unico"] = True
         ocupado_ate = df.at[i, "fim_capital"]
-    return marcar_capital_simultaneo(df)
-
-
-def marcar_capital_simultaneo(df, k=None):
-    """Ate k operacoes abertas ao mesmo tempo (selecionada_capital_2): entra se ha menos de k ainda abertas no dia."""
-    k = k or MAX_SIMULTANEAS
-    df["selecionada_capital_2"] = False
-    fins = []
-    validas = df[df.status.isin(STATUS_FECHADAS + ["aberta"])]
-    for i in validas.sort_values(["dataoperacao", "ordem_selecao_dia", "ticker"]).index:
-        d = df.at[i, "dataoperacao"]
-        fins = [f for f in fins if f > d]  # a que sai no dia liberta o capital (como no capital unico)
-        if len(fins) < k:
-            df.at[i, "selecionada_capital_2"] = True
-            fins.append(str(df.at[i, "fim_capital"]))
     return df
 
 
@@ -215,8 +201,7 @@ def resumo(df):
     print(df.status.value_counts().to_string())
     fechadas = df[df.status.isin(STATUS_FECHADAS)]
     cu = fechadas[fechadas.selecionada_capital_unico]
-    c2 = fechadas[fechadas.selecionada_capital_2.astype(bool)]
-    for nome, f in [("todos os sinais", fechadas), ("capital unico", cu), (f"ate {MAX_SIMULTANEAS} simultaneas", c2)]:
+    for nome, f in [("todos os sinais", fechadas), ("capital unico", cu)]:
         if not f.empty:
             print(f"{nome:16s} n={len(f):3d} media={f.retorno.mean():+.2f}% acerto={(f.retorno > 0).mean() * 100:.0f}% "
                   f"lucro com {VALOR_OPERACAO} por operacao={f.lucro.sum():+,.0f}")
