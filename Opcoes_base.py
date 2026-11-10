@@ -72,8 +72,18 @@ def delta_bs(spot, strike, du, vol, tipo):
     return _N(d1) if tipo == "CALL" else _N(d1) - 1
 
 
+def filtro_liquidez_desde(con, alias="l", col_data="op.data_operacao"):
+    """Ticker promovido pelo Liquidez_opc: so os sinais a partir do dia da promocao (liquidez_desde)."""
+    cols = {r[0] for r in con.execute(
+        "SELECT column_name FROM information_schema.columns WHERE table_name = 'Stocks_OPC_liquidez'").fetchall()}
+    if "liquidez_desde" not in cols:
+        return ""
+    return f"AND ({alias}.liquidez_desde IS NULL OR CAST({col_data} AS VARCHAR) >= {alias}.liquidez_desde)"
+
+
 def carregar_operacoes(con):
     filtro_estrategia = f"AND lower(trim(op.estrategia)) = '{ESTRATEGIA}'" if ESTRATEGIA else ""
+    filtro_desde = filtro_liquidez_desde(con)
     filtro_ordem = f"HAVING MIN(TRY_CAST(op.ordem_selecao_dia AS INTEGER)) <= {int(ORDEM_MAX)}" if ORDEM_MAX else ""
     return con.execute(
         f"""
@@ -91,6 +101,7 @@ def carregar_operacoes(con):
             ON trim(l.ticker) = trim(op.ticker)
         WHERE TRY_CAST(op.dia_hist AS INTEGER) = 1
           AND l.liquidez_classificacao IN ('Alta', 'Muito alta')
+          {filtro_desde}
           {filtro_estrategia}
         GROUP BY 1, 2
         {filtro_ordem}

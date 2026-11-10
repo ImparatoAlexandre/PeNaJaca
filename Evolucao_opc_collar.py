@@ -66,6 +66,15 @@ def dias_uteis(data_operacao, vencimento):
     return max(int(np.busday_count(inicio, vencimento + timedelta(days=1))), 0)
 
 
+def filtro_liquidez_desde(con):
+    """Ticker promovido pelo Liquidez_opc: so os sinais a partir do dia da promocao (igual ao Opcoes_base)."""
+    cols = {r[0] for r in con.execute(
+        "SELECT column_name FROM information_schema.columns WHERE table_name = 'Stocks_OPC_liquidez'").fetchall()}
+    if "liquidez_desde" not in cols:
+        return ""
+    return "AND (l.liquidez_desde IS NULL OR CAST(op.data_operacao AS VARCHAR) >= l.liquidez_desde)"
+
+
 def registrar_funcoes(con):
     con.create_function(
         "dias_uteis",
@@ -106,6 +115,7 @@ def criar_tabela(con, tabela=TABELA_DESTINO, so_alvo=False):
                 ON trim(l.ticker) = trim(op.ticker)
             WHERE TRY_CAST(op.dia_hist AS INTEGER) = 1
               AND l.liquidez_classificacao IN ('Alta', 'Muito alta')
+              {filtro_liquidez_desde(con)}
               {filtro_alvo}
         ),
         opcoes_base AS (
@@ -793,6 +803,7 @@ def preencher_puts_faltantes(con, tabela=TABELA_DESTINO):
                AND upper(trim(destino.ticker)) = upper(trim(op.ticker))
             WHERE TRY_CAST(op.dia_hist AS INTEGER) = 1
               AND l.liquidez_classificacao IN ('Alta', 'Muito alta')
+              {filtro_liquidez_desde(con)}
               AND destino.strike_put IS NULL
         ),
         opcoes_base AS (
@@ -1138,13 +1149,14 @@ def marcar_alvo(con):
         """
     )
     con.execute(
-        """
+        f"""
         CREATE OR REPLACE TEMP TABLE ops_alvo AS
         SELECT DISTINCT CAST(op.data_operacao AS VARCHAR) AS dataoperacao, trim(op.ticker) AS ticker
         FROM oper_abertas AS op
         INNER JOIN Stocks_OPC_liquidez AS l ON trim(l.ticker) = trim(op.ticker)
         WHERE TRY_CAST(op.dia_hist AS INTEGER) = 1
           AND l.liquidez_classificacao IN ('Alta', 'Muito alta')
+          {filtro_liquidez_desde(con)}
           AND NOT EXISTS (SELECT 1 FROM ops_fixas f
                           WHERE f.dataoperacao = CAST(op.data_operacao AS VARCHAR) AND f.ticker = trim(op.ticker))
         """

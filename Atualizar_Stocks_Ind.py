@@ -77,7 +77,9 @@ stocks = [
     'ED', 'STZ', 'COO', 'CPRT', 'CORT', 'CNM', 'GLW', 'CPAY', 'CTVA',
     'CSGP', 'COTY', 'CUZ', 'CR', 'CXT', 'CACC', 'CRH', 'CROX', 'CRWD', 'CCI',
     'CCK', 'CSX', 'CUBE', 'CMI', 'DHI', 'DRI', 'DDOG', 'DVA','SQ', 'MEG.TO', 
-    'FIL.TO', 'PKI.TO', 'CR.TO']
+    'FIL.TO', 'PKI.TO', 'CR.TO',
+    # ADRs / estrangeiras com opcoes liquidas nos EUA (2026-11-10): 6 Alta + ASX (Media, pico de 1 dia)
+    'BABA', 'ONON', 'SE', 'NVO', 'STNE', 'XPEV', 'ASX']
 
 Periodo = 5  # sempre atualiza/grava os 5 ultimos pregoes
 CALC_LOOKBACK = 90  # usa historico salvo + Yahoo recente para recalcular indicadores

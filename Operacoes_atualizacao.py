@@ -27,6 +27,7 @@ SCRIPTS = [
     "Operacoes_abertas.py",
     "Operacoes_abertas_ext.py",
     "Evolucao.py",
+    "Liquidez_opc.py",   # 1x por mes (1.a rodada do mes depois das 15h NY): liquidez das opcoes e promocao dos ativos no limite
     "Atualizacao_opc.py",
     "Evolucao_opc_collar.py",
     "Evolucao_stock.py",
