@@ -74,8 +74,8 @@ def gravar_liquidez(con, tickers, media):
 
 def main():
     args = sys.argv[1:]
-    media = set(args[args.index("--media") + 1:]) if "--media" in args else set()
-    tickers = [a for a in args if a != "--media"]
+    media = {a.strip().upper() for a in args[args.index("--media") + 1:]} if "--media" in args else set()
+    tickers = list(dict.fromkeys(a.strip().upper() for a in args if a != "--media"))  # sem repetidos
     if not tickers:
         raise SystemExit(__doc__)
     con = duckdb.connect(L.DB_FILE, config={"memory_limit": "2GB"})
