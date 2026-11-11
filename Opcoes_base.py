@@ -125,6 +125,61 @@ def carregar_precos(con, tickers, desde):
     return {t: g.set_index("d") for t, g in df.groupby("ticker")}
 
 
+# Indicadores do sinal (colunas das etapas 1 a 4; antes so no Evolucao_etapa3.py, movidos em 2026-11-11)
+INDICADORES = ["liquidez", "MOM20", "dist_MM50%", "VR10", "vol_hist20", "MIN %", "MAX %", "maior_mov %"]
+JANELA_VOL = 20  # vol_hist20: vol realizada anualizada (%) dos 20 retornos diarios ate ao dia do sinal
+DIAS_MOV = 7     # MIN % / MAX %: menor Min e maior Max do D1 ao D7 face ao close do sinal
+
+
+def carregar_indicadores(con, tickers, desde):
+    inicio = (pd.Timestamp(desde) - pd.Timedelta(days=60)).strftime("%Y%m%d")
+    px = con.execute(
+        """
+        SELECT CAST(data AS VARCHAR) AS d, trim(ticker) AS ticker, TRY_CAST(close AS DOUBLE) AS c,
+               TRY_CAST(Max AS DOUBLE) AS h, TRY_CAST(Min AS DOUBLE) AS l,
+               TRY_CAST(MOM20 AS DOUBLE) AS mom20, TRY_CAST("dist_MM50%" AS DOUBLE) AS dmm50, TRY_CAST(VR10 AS DOUBLE) AS vr10
+        FROM Stocks_Ind
+        WHERE CAST(data AS VARCHAR) >= ? AND trim(ticker) IN (SELECT unnest(?))
+        """, [inicio, list(tickers)]).fetchdf()
+    return {t: g.drop_duplicates("d", keep="last").set_index("d").sort_index() for t, g in px.groupby("ticker")}
+
+
+def indicadores(op, p):
+    """MOM20, dist_MM50% e VR10 da Stocks_Ind no dia do sinal; vol_hist20; MIN % / MAX % do D1 ao D7; maior_mov % = maior |MIN|, |MAX|."""
+    vazio = dict.fromkeys(INDICADORES[1:], np.nan)
+    if p is None or op.dataoperacao not in p.index or not op.close_oper == op.close_oper:
+        return vazio
+    s = p.loc[op.dataoperacao]
+    hist = p.c[p.index <= op.dataoperacao].tail(JANELA_VOL + 1)
+    vol = float(np.log(hist).diff().std() * np.sqrt(252) * 100) if len(hist) > JANELA_VOL else np.nan
+    fut = p[p.index > op.dataoperacao].iloc[:DIAS_MOV]
+    c0 = float(op.close_oper)
+    mn = (fut.l.min() / c0 - 1) * 100 if len(fut) else np.nan
+    mx = (fut.h.max() / c0 - 1) * 100 if len(fut) else np.nan
+    return {"MOM20": s.mom20, "dist_MM50%": s.dmm50, "VR10": s.vr10, "vol_hist20": vol, "MIN %": mn, "MAX %": mx,
+            "maior_mov %": max(abs(mn), abs(mx)) if len(fut) else np.nan}
+
+
+def calcular_indicadores(con, ops):
+    """INDICADORES (sem arredondar) para cada linha de ops (dataoperacao, ticker, close_oper), no mesmo indice;
+    liquidez = classificacao atual da Stocks_OPC_liquidez."""
+    if ops.empty:
+        return pd.DataFrame(columns=INDICADORES, index=ops.index)
+    ind_px = carregar_indicadores(con, ops.ticker.unique(), ops.dataoperacao.min())
+    ind = pd.DataFrame([indicadores(op, ind_px.get(op.ticker)) for op in ops.itertuples()], index=ops.index)
+    liq = con.execute("SELECT trim(ticker) AS t, any_value(liquidez_classificacao) AS l FROM Stocks_OPC_liquidez GROUP BY 1").fetchdf()
+    ind.insert(0, "liquidez", ops.ticker.map(liq.set_index("t").l))
+    return ind
+
+
+def juntar_indicadores(con, df):
+    """Acrescenta a df as colunas INDICADORES (arredondadas a 2 casas)."""
+    ind = calcular_indicadores(con, df)
+    for col in INDICADORES:
+        df[col] = ind[col].values if col == "liquidez" else pd.to_numeric(ind[col], errors="coerce").round(2).values
+    return df
+
+
 def carregar_opcoes(con, tickers, desde):
     lista = ",".join("'" + t.upper().replace("'", "''") + "'" for t in tickers)
     df = con.execute(

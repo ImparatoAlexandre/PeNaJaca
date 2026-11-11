@@ -10,7 +10,7 @@
 --   etapa4:       (tabela Evolucao_etapa4, mesmo script) regra ousada: mesmos sinais da etapa3, IV da call e da put <= 100%,
 --                 alvo +10% ou -10%, sem alvo sai ao close do D5
 -- ordem: ordem_selecao_dia do sinal (todos os modelos)
--- liquidez, MOM20, dist_MM50%, VR10, vol_hist20, MIN %, MAX %, maior_mov %: so etapa3 e etapa4 (MIN / MAX do D1 ao D7 face ao close do sinal)
+-- liquidez, MOM20, dist_MM50%, VR10, vol_hist20, MIN %, MAX %, maior_mov %: todas as etapas (Opcoes_base.calcular_indicadores; MIN / MAX do D1 ao D7 face ao close do sinal)
 -- hora: hora:minuto (HH:MM) da rodada em que o sinal entrou em oper_abertas (1.a selecao do dia)
 -- vol_call / vol_put: volatilidade implicita (%) usada no preco de entrada de cada opcao
 -- lucro_operacao: etapa1 a etapa4 = lucro de cada operacao fechada com 5000 (todos os sinais, tambem os que entram com outra operacao aberta;
@@ -24,8 +24,7 @@ WITH ops AS (
            ROUND(vol_put * 100, 1) AS vol_put, venc_put,
            alvo_alta AS alvo_saida, alvo_baixa AS stop_saida, status, SAIDA_data, saida_ativo, saida_call, saida_put, var_MAX_ativo,
            retorno, dias_capital, CASE WHEN selecionada_capital_unico THEN 1 ELSE 0 END AS capital_unico,
-           ordem_selecao_dia AS ordem, NULL AS liquidez, NULL AS MOM20, NULL AS "dist_MM50%", NULL AS VR10, NULL AS vol_hist20,
-           NULL AS "MIN %", NULL AS "MAX %", NULL AS "maior_mov %"
+           ordem_selecao_dia AS ordem, liquidez, MOM20, "dist_MM50%", VR10, vol_hist20, "MIN %", "MAX %", "maior_mov %"
     FROM Evolucao_call_put
     UNION ALL
     SELECT 'etapa2', dataoperacao, hora, ticker, estrategia, close_oper,
@@ -33,7 +32,7 @@ WITH ops AS (
            ROUND(vol_put * 100, 1), venc_put,
            alvo_alta, alvo_baixa, status, SAIDA_data, saida_ativo, saida_call, saida_put, var_MAX_ativo,
            retorno, dias_capital, CASE WHEN selecionada_capital_unico THEN 1 ELSE 0 END,
-           ordem_selecao_dia, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
+           ordem_selecao_dia, liquidez, MOM20, "dist_MM50%", VR10, vol_hist20, "MIN %", "MAX %", "maior_mov %"
     FROM Evolucao_vol_call_put
     UNION ALL
     SELECT 'etapa3', dataoperacao, hora, ticker, estrategia, close_oper,

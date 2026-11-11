@@ -15,6 +15,8 @@ Retorno  % do par: (saida_call + saida_put) / (valor_call + valor_put) - 1; lucr
 Capital  capital unico: uma operacao de cada vez, sempre com VALOR_OPERACAO (o lucro e retirado, a perda reposta).
 Precos   opcoes a Black-Scholes com o preco do ativo no momento e a volatilidade da recolha (funcoes do Opcoes_base).
 Trava    entrada (strikes, IV, valores) dos sinais de hoje gravada na 1.a rodada em Entrada_opc_travada (Opcoes_base.avaliar_com_travas).
+Colunas  no fim, os indicadores do sinal (Opcoes_base.INDICADORES: liquidez, MOM20, dist_MM50%, VR10, vol_hist20, MIN %, MAX %,
+         maior_mov %), como nas etapas 3 e 4.
 """
 import sqlite3
 
@@ -178,8 +180,8 @@ def construir(con):
     opc = base.carregar_opcoes(con, ops.ticker.unique(), base.ymd(base.para_data(desde) - pd.Timedelta(days=base.DIAS_FALLBACK_CADEIA)))
     df = base.avaliar_com_travas(con, "call_put", ops, avaliar, px, opc)
     df = filtrar_iv(df)
-    df = marcar_capital_unico(df).reindex(columns=COLUNAS)
-    for col in ["hora", "estrategia", "venc_put", "SAIDA_data", "status"]:
+    df = base.juntar_indicadores(con, marcar_capital_unico(df)).reindex(columns=COLUNAS + base.INDICADORES)
+    for col in ["hora", "estrategia", "venc_put", "SAIDA_data", "status", "liquidez"]:
         df[col] = df[col].astype("object")
     con.register("df_call_put", df)
     con.execute(f"CREATE OR REPLACE TABLE {TABELA_DESTINO} AS SELECT * FROM df_call_put ORDER BY dataoperacao DESC, ticker")

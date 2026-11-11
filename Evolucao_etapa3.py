@@ -8,7 +8,7 @@ Regras   (MODELOS) IV de cada perna (call e put) em ]iv_min, iv_max], alvo ±alv
            etapa3 (segura): IV 60-80%, ±7%, D5   -> historico out/25-out/26: 54 sinais, acerto 80%, pior -19%
            etapa4 (ousada): IV <= 100%, ±10%, D5 -> historico: 133 sinais, acerto 83%, pior -65%
          (2026-11-11; antes a etapa3 era ±10%, D7, sem limite de IV.) Sinais sem opcoes ficam na tabela (a view nao os mostra).
-Colunas  MOM20, dist_MM50% e VR10: Stocks_Ind no dia do sinal.
+Colunas  (Opcoes_base.calcular_indicadores, tambem usadas nas etapas 1 e 2) MOM20, dist_MM50% e VR10: Stocks_Ind no dia do sinal.
          vol_hist20: vol realizada anualizada (%) dos JANELA_VOL retornos diarios ate ao dia do sinal (mesma conta do Vol_momento).
          MIN % / MAX %: menor Min e maior Max do D1 ao D7 face ao close do sinal (como a Evolucao); maior_mov % = maior entre |MIN| e |MAX|.
          liquidez: classificacao atual da Stocks_OPC_liquidez.
@@ -34,44 +34,14 @@ ESTRATEGIA = "ext"
 ORDEM_MAX = 3
 VR10_MAX = 1.3
 VOL_MIN = 70.0
-JANELA_VOL = 20
-DIAS_MOV = 7
 
 MODELOS = {
     "etapa3": dict(tabela="Evolucao_etapa3", iv_min=0.60, iv_max=0.80, alvo=0.07, corte=5),
     "etapa4": dict(tabela="Evolucao_etapa4", iv_min=None, iv_max=1.00, alvo=0.10, corte=5),
 }
 
-INDICADORES = ["liquidez", "MOM20", "dist_MM50%", "VR10", "vol_hist20", "MIN %", "MAX %", "maior_mov %"]
+INDICADORES = base.INDICADORES  # calculados no Opcoes_base (comuns as etapas 1 a 4)
 COLUNAS = cp.COLUNAS + INDICADORES
-
-
-def carregar_indicadores(con, tickers, desde):
-    inicio = (pd.Timestamp(desde) - pd.Timedelta(days=60)).strftime("%Y%m%d")
-    px = con.execute(
-        """
-        SELECT CAST(data AS VARCHAR) AS d, trim(ticker) AS ticker, TRY_CAST(close AS DOUBLE) AS c,
-               TRY_CAST(Max AS DOUBLE) AS h, TRY_CAST(Min AS DOUBLE) AS l,
-               TRY_CAST(MOM20 AS DOUBLE) AS mom20, TRY_CAST("dist_MM50%" AS DOUBLE) AS dmm50, TRY_CAST(VR10 AS DOUBLE) AS vr10
-        FROM Stocks_Ind
-        WHERE CAST(data AS VARCHAR) >= ? AND trim(ticker) IN (SELECT unnest(?))
-        """, [inicio, list(tickers)]).fetchdf()
-    return {t: g.drop_duplicates("d", keep="last").set_index("d").sort_index() for t, g in px.groupby("ticker")}
-
-
-def indicadores(op, p):
-    vazio = dict.fromkeys(INDICADORES[1:], np.nan)
-    if p is None or op.dataoperacao not in p.index or not op.close_oper == op.close_oper:
-        return vazio
-    s = p.loc[op.dataoperacao]
-    hist = p.c[p.index <= op.dataoperacao].tail(JANELA_VOL + 1)
-    vol = float(np.log(hist).diff().std() * np.sqrt(252) * 100) if len(hist) > JANELA_VOL else np.nan
-    fut = p[p.index > op.dataoperacao].iloc[:DIAS_MOV]
-    c0 = float(op.close_oper)
-    mn = (fut.l.min() / c0 - 1) * 100 if len(fut) else np.nan
-    mx = (fut.h.max() / c0 - 1) * 100 if len(fut) else np.nan
-    return {"MOM20": s.mom20, "dist_MM50%": s.dmm50, "VR10": s.vr10, "vol_hist20": vol, "MIN %": mn, "MAX %": mx,
-            "maior_mov %": max(abs(mn), abs(mx)) if len(fut) else np.nan}
 
 
 def carregar_sinais(con):
@@ -79,11 +49,8 @@ def carregar_sinais(con):
     base.ESTRATEGIA, base.ORDEM_MAX = ESTRATEGIA, ORDEM_MAX
     ops = base.carregar_operacoes(con)
     desde = ops.dataoperacao.min()
-    ind_px = carregar_indicadores(con, ops.ticker.unique(), desde)
-    ind = pd.DataFrame([indicadores(op, ind_px.get(op.ticker)) for op in ops.itertuples()], index=ops.index)
+    ind = base.calcular_indicadores(con, ops)
     ok = (ind.VR10 < VR10_MAX) & (ind.vol_hist20 > VOL_MIN)
-    liq = con.execute("SELECT trim(ticker) AS t, any_value(liquidez_classificacao) AS l FROM Stocks_OPC_liquidez GROUP BY 1").fetchdf()
-    ind["liquidez"] = ops.ticker.map(liq.set_index("t").l)
     return ops[ok].reset_index(drop=True), ind[ok].reset_index(drop=True), desde
 
 

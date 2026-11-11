@@ -7,6 +7,7 @@ Escolha  para cada sinal calcula as pernas de entrada do Evolucao_call_put (call
          vol_par = (IV call + IV put) / 2. Dia com par ja travado (Entrada_opc_travada, modelo vol_call_put): fica esse
          par, mesmo que uma rodada seguinte traga um par de vol menor.
 Entrada  saida, retorno e capital unico: iguais ao Evolucao_call_put (avaliar), com VALOR_OPERACAO no par.
+Colunas  no fim, os indicadores do sinal (Opcoes_base.INDICADORES), como nas etapas 3 e 4.
 """
 import sqlite3
 
@@ -82,8 +83,8 @@ def construir(con):
     sel = escolher_pares(con, ops, opc).reset_index(drop=True)
     df = base.avaliar_com_travas(con, MODELO, sel, avaliar, px, opc)
     df["vol_par"], df["candidatos"] = sel.vol_par.values, sel.candidatos.values
-    df = cp.marcar_capital_unico(df).reindex(columns=COLUNAS)
-    for col in ["hora", "estrategia", "venc_put", "SAIDA_data", "status"]:
+    df = base.juntar_indicadores(con, cp.marcar_capital_unico(df)).reindex(columns=COLUNAS + base.INDICADORES)
+    for col in ["hora", "estrategia", "venc_put", "SAIDA_data", "status", "liquidez"]:
         df[col] = df[col].astype("object")
     con.register("df_vol_call_put", df)
     con.execute(f"CREATE OR REPLACE TABLE {TABELA_DESTINO} AS SELECT * FROM df_vol_call_put ORDER BY dataoperacao DESC, ticker")
