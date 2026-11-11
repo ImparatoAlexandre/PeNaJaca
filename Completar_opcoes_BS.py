@@ -11,7 +11,9 @@ grava no dia do sinal (DataRegistro = dataoperacao) uma cadeia sintetica de PUT 
 As linhas ficam marcadas com ID terminado em _BS, volume = 0 e openInterest = 0.
 Remover: DELETE FROM Call_Put_dados WHERE ID LIKE '%\\_BS' ESCAPE '\\'
 
-Uso: python Completar_opcoes_BS.py [AAAAMM ...] [--simular]
+Uso: python Completar_opcoes_BS.py [AAAAMM ...] [--tabela=Evolucao_etapa3] [--simular]
+     --tabela: tabela de sinais (com dataoperacao, ticker, close_oper, status) no SQLite; omissao TABELA_SINAIS.
+     2026-11-11: corrido com --tabela=Evolucao_etapa3 de 202510 a 202608 (ordens 2 e 3 sem cadeia; muda tambem a etapa2).
 """
 import sqlite3
 import sys
@@ -120,11 +122,12 @@ def cadeia_bs(ticker, dia, spot, vol, vencimentos=None, strikes_extra=()):
 def main():
     simular = "--simular" in sys.argv
     meses = [a for a in sys.argv[1:] if a.isdigit() and len(a) == 6] or MESES
+    tabela = next((a.split("=", 1)[1] for a in sys.argv[1:] if a.startswith("--tabela=")), TABELA_SINAIS)
     filtro_mes = " OR ".join(f"dataoperacao LIKE '{m}%'" for m in meses)
     sq = sqlite3.connect(SQLITE_FILE)
     status = ",".join(f"'{s}'" for s in STATUS_SEM_DADOS)
     sinais = pd.read_sql(
-        f"SELECT dataoperacao, ticker, close_oper, status FROM {TABELA_SINAIS} "
+        f"SELECT dataoperacao, ticker, close_oper, status FROM {tabela} "
         f"WHERE ({filtro_mes}) AND status IN ({status}) ORDER BY dataoperacao", sq)
     sq.close()
     if sinais.empty:
