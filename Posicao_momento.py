@@ -1,4 +1,4 @@
-"""Posicao no momento da captura das operacoes da view Evolucao_put_operacoes (mesmas linhas e modelos: etapa1, etapa2 e etapa3).
+"""Posicao no momento da captura das operacoes da view Evolucao_put_operacoes (mesmas linhas e modelos: etapa1 a etapa4).
 
 Ativo    close_atual = close da ultima linha do ticker em Stocks_Ind; Var%ativo = close_atual / close_oper - 1 (%).
 Opcoes   ultima captura do ticker em Call_Put_dados, mesmo tipo, vencimento e strike da operacao:
@@ -98,7 +98,7 @@ def construir(con):
     ops["data_captura"] = ops.ticker.str.strip().str.upper().map(capturas).fillna(ops.data_preco)
     ops["Var%ativo"] = ((ops.close_atual / ops.close_oper - 1) * 100).round(2)
     ret_call_put = (ops.valor_call_atual + ops.valor_put_atual) / (ops.valor_call + ops.valor_put) - 1
-    ops["retorno%"] = np.where(ops.modelo.isin(["etapa1", "etapa2", "etapa3", "call_put", "vol_call_put"]), ret_call_put * 100, ops["Var%ativo"]).round(2)
+    ops["retorno%"] = np.where(ops.modelo.isin(["etapa1", "etapa2", "etapa3", "etapa4", "call_put", "vol_call_put"]), ret_call_put * 100, ops["Var%ativo"]).round(2)
 
     venc = pd.to_datetime(ops.venc_put, errors="coerce")
     captura = pd.to_datetime(ops.data_captura, format="%Y%m%d", errors="coerce")

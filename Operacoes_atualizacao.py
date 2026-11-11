@@ -33,7 +33,7 @@ SCRIPTS = [
     # "Evolucao_stock.py",  # modelo stock fora da view desde 2026-11-11 (Etapa 1 e Etapa 2 nao dependem dele)
     "Evolucao_call_put.py",
     "Evolucao_vol_call_put.py",
-    "Evolucao_etapa3.py",  # etapa3 na view: sinais ext com VR10 < 1.3, vol_hist20 > 70 e liquidez Alta / Muito alta (sem opcoes)
+    "Evolucao_etapa3.py",  # etapa3 (segura) e etapa4 (ousada): sinais ext ordem 1-3 com VR10 < 1.3 e vol_hist20 > 70
     "Posicao_momento.py",
     "Vol_momento.py",
     "Volume_OPC_strike.py",
