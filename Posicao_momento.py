@@ -1,4 +1,4 @@
-"""Posicao no momento da captura das operacoes da view Evolucao_put_operacoes (mesmas linhas e modelos).
+"""Posicao no momento da captura das operacoes da view Evolucao_put_operacoes (mesmas linhas e modelos: etapa1 e etapa2).
 
 Ativo    close_atual = close da ultima linha do ticker em Stocks_Ind; Var%ativo = close_atual / close_oper - 1 (%).
 Opcoes   ultima captura do ticker em Call_Put_dados, mesmo tipo, vencimento e strike da operacao:

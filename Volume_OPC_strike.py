@@ -1,6 +1,6 @@
 """Volume das opcoes por strike no vencimento das operacoes: tabela Volume_OPC_strike (DuckDB e SQLite do Metabase).
 
-Operacoes  linhas da view Evolucao_put_operacoes (modelos stock, call_put, vol_call_put) com dataoperacao >= DESDE;
+Operacoes  linhas da view Evolucao_put_operacoes (modelos etapa1 e etapa2) com dataoperacao >= DESDE;
            cada par (ticker, vencimento = venc_put) entra com a 1.a data de operacao. Novos sinais entram sozinhos
            na rodada seguinte do Operacoes_atualizacao (corre depois dos modelos).
 Dados      Call_Put_dados (sem as linhas sinteticas _BS), da 1.a data de operacao ate ao vencimento, todos os strikes

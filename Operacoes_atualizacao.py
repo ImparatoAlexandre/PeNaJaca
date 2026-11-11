@@ -30,7 +30,7 @@ SCRIPTS = [
     "Liquidez_opc.py",   # 1x por mes (1.a rodada do mes depois das 15h NY): liquidez das opcoes e promocao dos ativos no limite
     "Atualizacao_opc.py",
     "Evolucao_opc_collar.py",
-    "Evolucao_stock.py",
+    # "Evolucao_stock.py",  # modelo stock fora da view desde 2026-11-11 (Etapa 1 e Etapa 2 nao dependem dele)
     "Evolucao_call_put.py",
     "Evolucao_vol_call_put.py",
     "Posicao_momento.py",
