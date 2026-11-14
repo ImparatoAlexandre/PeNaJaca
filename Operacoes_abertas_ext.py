@@ -16,6 +16,11 @@ METABASE_TABLE = "oper_abertas"
 SQLITE_DB_FILE = r"C:\Metabase\data\visualizacao.sqlite"
 SQLITE_TABLE = "oper_abertas"
 ORDEM_VISIVEL = 3  # mesma ORDEM_MAX do Evolucao_vol_call_put (o maior dos modelos): ext com ordem <= isto ficam travados no dia
+# 2026-11-14: ordem so entre os tickers com opcoes liquidas (Alta / Muito alta), gravada a parte em TABELA_LIQ (nao entra
+# em oper_abertas, que tem leitores sem filtro de estrategia). A etapa13 usa-a quando o capital esta livre e as etapas 1 e 3 nao tem sinal.
+TABELA_LIQ = "oper_abertas_liq"
+ORDEM_LIQ_MAX = 3
+AMP_LIQ_MIN = 10.0  # amplitude minima (%): abaixo disto os candles fracos traziam perdas de -60% a -100% (simulacao out/25-nov/26)
 
 pd.set_option("display.max_columns", None)
 pd.set_option("display.width", 10000)
@@ -197,9 +202,45 @@ def limpar_ext_dia(con, data_operacao, travar):
     return travados
 
 
-def main(data_operacao=None, exportar=True, travar=True):
+def gravar_liq(con, data_operacao, liq, hora_execucao, hora_minuto, travar):
+    """Grava em TABELA_LIQ os candidatos extremos do dia na ordem so entre os tickers com opcoes liquidas
+    (ordem_liq <= ORDEM_LIQ_MAX e amplitude_candle >= AMP_LIQ_MIN). Usados pela etapa13 nos dias sem sinal das etapas 1 e 3.
+    travar=True: os tickers ja gravados no dia ficam (1.a rodada); so entram tickers novos. travar=False: refaz o dia."""
+    con.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS {TABELA_LIQ} (
+            data_operacao VARCHAR, "Time" VARCHAR, hora VARCHAR, ticker VARCHAR, close DOUBLE, ordem_liq INTEGER,
+            ordem_ext INTEGER, amplitude_candle DOUBLE, variacao_close DOUBLE, movimento VARCHAR, Stock_ID VARCHAR
+        )
+        """
+    )
+    dia = str(data_operacao)
+    existentes = set()
+    if travar:
+        existentes = {r[0] for r in con.execute(
+            f"SELECT trim(ticker) FROM {TABELA_LIQ} WHERE data_operacao = ?", [dia]).fetchall()}
+    else:
+        con.execute(f"DELETE FROM {TABELA_LIQ} WHERE data_operacao = ?", [dia])
+    novos = liq[~liq["ticker"].str.strip().isin(existentes)]
+    if novos.empty:
+        return 0
+    df = pd.DataFrame({
+        "data_operacao": dia, "Time": hora_execucao, "hora": hora_minuto, "ticker": novos["ticker"].str.strip().values,
+        "close": pd.to_numeric(novos["close"], errors="coerce").values, "ordem_liq": novos["rn_liq"].astype(int).values,
+        "ordem_ext": novos["rn_dia"].astype(int).values, "amplitude_candle": novos["amplitude_candle"].round(2).values,
+        "variacao_close": novos["variacao_close"].round(2).values, "movimento": novos["movimento"].values,
+        "Stock_ID": novos["Stock_ID"].astype(str).values,
+    })
+    con.register("df_liq", df)
+    con.execute(f"INSERT INTO {TABELA_LIQ} BY NAME SELECT * FROM df_liq")
+    con.unregister("df_liq")
+    return len(df)
+
+
+def main(data_operacao=None, exportar=True, travar=True, so_liq=False):
     """data_operacao: data a processar (None = ultima). exportar=False: nao exporta para o Metabase nem escreve o log (reprocessamento).
-    travar=False: refaz todos os ext do dia (sem manter os ja visiveis)."""
+    travar=False: refaz todos os ext do dia (sem manter os ja visiveis).
+    so_liq=True: so grava TABELA_LIQ (nao mexe nos ext de oper_abertas); usado no reprocessamento do historico da etapa13."""
     con = duckdb.connect(DB_FILE, config={"memory_limit": "2GB"})
     agora = datetime.now()
     hora_execucao = agora.strftime("%H%M")
@@ -365,33 +406,46 @@ def main(data_operacao=None, exportar=True, travar=True):
                     ELSE 0
                 END AS candle_confirma,
                 l.ranking_liquidez AS ranking_liquidez_opcoes,
-                l.volume_total_opcoes AS volume_opcoes
+                l.volume_total_opcoes AS volume_opcoes,
+                COALESCE(l.liquidez_classificacao IN ('Alta', 'Muito alta'), FALSE) AS opcoes_liquidas
             FROM com_perspectiva c
             LEFT JOIN Stocks_OPC_liquidez l
               ON l.ticker = c.ticker
-        ), uma_operacao_por_dia AS (
+        ), ordenados AS (
             -- perspectiva e so coluna informativa: nao filtra nem entra na ordem do dia
-            SELECT *
-            FROM (
-                SELECT
-                    *,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY data
-                        ORDER BY
-                            amplitude_candle DESC,
-                            ticker,
-                            Stock_ID
-                    ) AS rn_dia
-                FROM candidatos_com_liquidez
-            )
-            WHERE rn_dia <= 3
+            -- rn_dia: ordem entre todos os tickers (sinais ext); rn_liq: ordem so entre os de opcoes liquidas (oper_abertas_liq)
+            SELECT
+                *,
+                ROW_NUMBER() OVER (
+                    PARTITION BY data
+                    ORDER BY
+                        amplitude_candle DESC,
+                        ticker,
+                        Stock_ID
+                ) AS rn_dia,
+                ROW_NUMBER() OVER (
+                    PARTITION BY data, opcoes_liquidas
+                    ORDER BY
+                        amplitude_candle DESC,
+                        ticker,
+                        Stock_ID
+                ) AS rn_liq
+            FROM candidatos_com_liquidez
         )
         SELECT *
-        FROM uma_operacao_por_dia
+        FROM ordenados
+        WHERE rn_dia <= 3
+           OR (opcoes_liquidas AND rn_liq <= ? AND amplitude_candle >= ?)
         ORDER BY rn_dia, ticker
         """,
-        [data_operacao],
+        [data_operacao, ORDEM_LIQ_MAX, AMP_LIQ_MIN],
     ).fetchdf()
+    liq = filtrados[filtrados["opcoes_liquidas"] & (filtrados["rn_liq"] <= ORDEM_LIQ_MAX) & (filtrados["amplitude_candle"] >= AMP_LIQ_MIN)]
+    filtrados = filtrados[filtrados["rn_dia"] <= 3].drop(columns=["opcoes_liquidas", "rn_liq"]).reset_index(drop=True)
+    linhas_liq = gravar_liq(con, data_operacao, liq, hora_execucao, hora_minuto, travar)
+    if so_liq:
+        con.close()
+        return linhas_liq
 
     travados = limpar_ext_dia(con, data_operacao, travar)
     mantidos_txt = ",".join(sorted(travados)) or "-"

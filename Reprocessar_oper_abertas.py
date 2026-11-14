@@ -5,7 +5,9 @@ sem exportar a cada dia; no fim exporta oper_abertas uma vez para o Metabase (Du
 Datas que ja tem fase2 sincronizado (Time = 'SYNC') sao saltadas na fase2 para nao duplicar.
 Os ext e fase2 do dia sao refeitos todos (travar=False): os travados de rodadas durante o dia nao sao mantidos.
 
-Uso: python Reprocessar_oper_abertas.py AAAAMMDD AAAAMMDD
+Uso: python Reprocessar_oper_abertas.py AAAAMMDD AAAAMMDD [--so-liq]
+     --so-liq: so refaz a tabela oper_abertas_liq (ordem so entre tickers liquidos, usada pela etapa13);
+               oper_abertas (ext e fase2) fica como esta.
 """
 import contextlib
 import io
@@ -25,6 +27,7 @@ def main():
         print(__doc__)
         return
     data_de, data_ate = sys.argv[1], sys.argv[2]
+    so_liq = "--so-liq" in sys.argv
     con = duckdb.connect(DB_FILE, read_only=True, config={"memory_limit": "2GB"})
     datas = [r[0] for r in con.execute(
         "SELECT DISTINCT data FROM Stocks_Ind WHERE CAST(data AS VARCHAR) BETWEEN ? AND ? ORDER BY 1",
@@ -33,6 +36,16 @@ def main():
         "SELECT DISTINCT CAST(data_operacao AS VARCHAR) FROM oper_abertas WHERE estrategia = 'fase2' AND \"Time\" = 'SYNC'"
     ).fetchall()}
     con.close()
+
+    if so_liq:
+        total = 0
+        for d in datas:
+            with contextlib.redirect_stdout(io.StringIO()):
+                n = ext.main(d, exportar=False, travar=False, so_liq=True)
+            total += n or 0
+            print(d, n, flush=True)
+        print(f"{ext.TABELA_LIQ}: {total} sinais gravados no periodo.")
+        return
 
     for d in datas:
         with contextlib.redirect_stdout(io.StringIO()):
