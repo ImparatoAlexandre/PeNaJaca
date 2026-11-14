@@ -3,10 +3,10 @@ que tendem a mexer muito. A etapa3 e a regra segura (compor capital), a etapa4 a
 
 Sinais   oper_abertas com estrategia = "ext", dia_hist = 1 e ordem_selecao_dia <= ORDEM_MAX (3), com opcoes liquidas
          (Alta / Muito alta, mesma selecao das Etapas 1 e 2: Opcoes_base.carregar_operacoes).
-Filtro   VR10 < VR10_MAX (1.3) e vol_hist20 > VOL_MIN (70%), comum as duas etapas.
+Filtro   VR10 < VR10_MAX (2.5; era 1.3) e vol_hist20 > VOL_MIN (70%), comum as duas etapas.
 Regras   (MODELOS) IV de cada perna (call e put) em ]iv_min, iv_max], alvo ±alvo no ativo, corte ao close do corte.o dia de pregao:
-           etapa3 (segura): IV 60-80%, ±7%, D5   -> historico out/25-out/26: 54 sinais, acerto 80%, pior -19%
-           etapa4 (ousada): IV <= 100%, ±10%, D5 -> historico: 133 sinais, acerto 83%, pior -65%
+           etapa3 (segura): IV 60-80%, ±7%, D5   -> historico out/25-nov/26 (VR10 < 2.5): 62 sinais, acerto 81%, pior -23%
+           etapa4 (ousada): IV <= 100%, ±10%, D5 -> historico (VR10 < 2.5): 160 sinais, acerto 79%, pior -65%
          (2026-11-11; antes a etapa3 era ±10%, D7, sem limite de IV.) Sinais sem opcoes ficam na tabela (a view nao os mostra).
 Colunas  (Opcoes_base.calcular_indicadores, tambem usadas nas etapas 1 e 2) MOM20, dist_MM50% e VR10: Stocks_Ind no dia do sinal.
          vol_hist20: vol realizada anualizada (%) dos JANELA_VOL retornos diarios ate ao dia do sinal (mesma conta do Vol_momento).
@@ -32,7 +32,7 @@ SQLITE_FILE = base.SQLITE_FILE
 
 ESTRATEGIA = "ext"
 ORDEM_MAX = 3
-VR10_MAX = 1.3
+VR10_MAX = 2.5   # 2026-11-11: 1.3 -> 2.5 (etapa3 +10 operacoes, mesmo acerto; vol_hist20 mantido, baixar piora)
 VOL_MIN = 70.0
 
 MODELOS = {

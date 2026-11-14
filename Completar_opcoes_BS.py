@@ -150,6 +150,9 @@ def main():
             df = df.merge(existentes.assign(_x=1), how="left", on=["tipo", "dataStrike", "strike"])
             df = df[df._x.isna()].drop(columns="_x")
         put40 = df[(df.tipo == "PUT") & (df.dataStrike == df.dataStrike.min())]
+        if put40.empty:  # cadeia (BS ou real) ja gravada com estes strikes: nada a acrescentar
+            print(f"{s.dataoperacao} {t:5s} sem linhas novas (cadeia ja existe nesses strikes)")
+            continue
         put40 = put40.iloc[(put40.delta + 0.40).abs().argsort().iloc[0]]
         print(f"{s.dataoperacao} {t:5s} close {s.close_oper:8.2f} vol {vol:.3f} [{origem}] -> {len(df)} linhas, "
               f"put -0.40: venc {put40.dataStrike} strike {put40.strike:g} delta {put40.delta} preco {put40.lastPrice}")
