@@ -1,13 +1,13 @@
-"""Reprocessa oper_abertas (ext e fase2) para um periodo passado, dia a dia.
+"""Reprocessa os sinais ext de oper_abertas para um periodo passado, dia a dia.
 
-Corre Operacoes_abertas_ext.main e Operacoes_abertas.main para cada data de Stocks_Ind no periodo,
-sem exportar a cada dia; no fim exporta oper_abertas uma vez para o Metabase (DuckDB e SQLite).
-Datas que ja tem fase2 sincronizado (Time = 'SYNC') sao saltadas na fase2 para nao duplicar.
-Os ext e fase2 do dia sao refeitos todos (travar=False): os travados de rodadas durante o dia nao sao mantidos.
+Corre Operacoes_abertas_ext.main para cada data de Stocks_Ind no periodo, sem exportar a cada dia;
+no fim exporta oper_abertas uma vez para o Metabase (DuckDB e SQLite).
+Os ext do dia sao refeitos todos (travar=False): os travados de rodadas durante o dia nao sao mantidos.
+(2026-11-17: os sinais fase2 sairam da atualizacao; Operacoes_abertas.py em backup/antes_remover_fase_20261117.)
 
 Uso: python Reprocessar_oper_abertas.py AAAAMMDD AAAAMMDD [--so-liq]
      --so-liq: so refaz a tabela oper_abertas_liq (ordem so entre tickers liquidos, usada pela etapa13);
-               oper_abertas (ext e fase2) fica como esta.
+               oper_abertas fica como esta.
 """
 import contextlib
 import io
@@ -15,7 +15,6 @@ import sys
 
 import duckdb
 
-import Operacoes_abertas as fase2
 import Operacoes_abertas_ext as ext
 
 
@@ -32,9 +31,6 @@ def main():
     datas = [r[0] for r in con.execute(
         "SELECT DISTINCT data FROM Stocks_Ind WHERE CAST(data AS VARCHAR) BETWEEN ? AND ? ORDER BY 1",
         [data_de, data_ate]).fetchall()]
-    sync = {r[0] for r in con.execute(
-        "SELECT DISTINCT CAST(data_operacao AS VARCHAR) FROM oper_abertas WHERE estrategia = 'fase2' AND \"Time\" = 'SYNC'"
-    ).fetchall()}
     con.close()
 
     if so_liq:
@@ -50,8 +46,6 @@ def main():
     for d in datas:
         with contextlib.redirect_stdout(io.StringIO()):
             ext.main(d, exportar=False, travar=False)
-            if str(d) not in sync:
-                fase2.main(d, exportar=False, travar=False)
         print(d, flush=True)
 
     con = duckdb.connect(DB_FILE, config={"memory_limit": "2GB"})

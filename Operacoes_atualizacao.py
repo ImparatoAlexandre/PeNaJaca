@@ -5,7 +5,7 @@ import ctypes
 import os
 import subprocess
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 import duckdb
@@ -22,9 +22,8 @@ DIAS_STOCKS_SQLITE = 10  # sincronizacao final: pregoes da Stocks_Ind regravados
 
 SCRIPTS = [
     "Atualizar_Stocks_Ind.py",
-    "Operacoes_fase1.py",
-    "Operacoes_fase2.py",
-    "Operacoes_abertas.py",
+    # Operacoes_fase1/fase2/abertas (sinais fase2) em backup/antes_remover_fase_20261117 desde 2026-11-17: sem vantagem
+    # sobre o acaso e nenhuma etapa os usa (etapas 1-4 e 13 so leem sinais ext)
     "Operacoes_abertas_ext.py",
     "Evolucao.py",
     "Liquidez_opc.py",   # 1x por mes (1.a rodada do mes depois das 15h NY): liquidez das opcoes e promocao dos ativos no limite
@@ -46,12 +45,6 @@ def log(msg):
     print(texto, flush=True)
     with LOG_FILE.open("a", encoding="utf-8") as f:
         f.write(texto + "\n")
-
-
-def periodo_automatico():
-    data_de = (datetime.now() - timedelta(days=5)).strftime("%Y%m%d")
-    data_ate = datetime.now().strftime("%Y%m%d")
-    return data_de, data_ate
 
 
 def stocks_ind_atualizada_hoje():
@@ -83,11 +76,6 @@ def rodar_script(nome_script):
 
 
     comando = [sys.executable, str(script_path)]
-    if nome_script == "Operacoes_fase2.py":
-        data_de, data_ate = periodo_automatico()
-        comando.extend([data_de, data_ate])
-        log(f"PERIODO automatico {nome_script}: {data_de} ate {data_ate}")
-
     log(f"INICIO {nome_script}")
     resultado = subprocess.Popen(comando, cwd=str(BASE_DIR), text=True)
     sem_abrandamento(int(resultado._handle))  # o script filho tambem fica fora do abrandamento do Windows
