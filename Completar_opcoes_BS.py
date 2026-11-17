@@ -7,7 +7,7 @@ grava no dia do sinal (DataRegistro = dataoperacao) uma cadeia sintetica de PUT 
   - volatilidade: IV ATM da 1.a cadeia real do ticker (>= 20 linhas); se essa cadeia estiver a mais de
     DIAS_REF_MAX dias do sinal, media entre essa IV e a vol realizada de 20 dias ajustada pela razao IV/RV
     do dia de referencia;
-  - preco: bs_opcao do Evolucao_opc_collar (mesma formula do Opcoes_base); bid = ask = lastPrice.
+  - preco: bs_opcao do Opcoes_base; bid = ask = lastPrice.
 As linhas ficam marcadas com ID terminado em _BS, volume = 0 e openInterest = 0.
 Remover: DELETE FROM Call_Put_dados WHERE ID LIKE '%\\_BS' ESCAPE '\\'
 
@@ -24,7 +24,7 @@ import numpy as np
 import pandas as pd
 
 from Opcoes_base import delta_bs, dias_uteis, para_data, venc_valido, ymd
-from Evolucao_opc_collar import bs_opcao
+from Opcoes_base import bs_opcao
 
 
 DB_FILE = r"C:\BD\Stocks.duckdb"

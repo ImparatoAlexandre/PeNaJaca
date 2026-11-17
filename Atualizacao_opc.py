@@ -23,10 +23,7 @@ SQL_CONTRATOS_OPERACOES = """
         UNION ALL SELECT trim(ticker), CAST(venc_put AS VARCHAR)[:10], 'PUT', strike_put FROM Entrada_opc_travada
         UNION ALL SELECT trim(ticker), CAST(venc_put AS VARCHAR)[:10], 'CALL', strike_call FROM Evolucao_put_operacoes
         UNION ALL SELECT trim(ticker), CAST(venc_put AS VARCHAR)[:10], 'PUT', strike_put FROM Evolucao_put_operacoes
-        UNION ALL SELECT trim(ticker), CAST(venc_put AS VARCHAR)[:10], 'PUT', strike_put FROM Evolucao_opc_collar
-        UNION ALL SELECT trim(ticker), CAST(venc_put AS VARCHAR)[:10], 'PUT', p95_strike_put FROM Evolucao_opc_collar
-        UNION ALL SELECT trim(ticker), CAST(venc_put AS VARCHAR)[:10], 'CALL', strike_call FROM Evolucao_opc_collar
-        UNION ALL SELECT trim(ticker), CAST(venc_put AS VARCHAR)[:10], 'CALL', otm_strike_call FROM Evolucao_opc_collar
+        -- Evolucao_opc_collar saiu em 2026-11-17 (collar fora da atualizacao)
     )
     WHERE strike IS NOT NULL AND venc IS NOT NULL AND replace(venc, '-', '') >= ?
 """

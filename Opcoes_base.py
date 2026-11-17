@@ -3,7 +3,7 @@
 Sinais   carregar_operacoes: sinais de oper_abertas (dia_hist = 1) com opcoes de liquidez Alta / Muito alta, filtrados por
          ESTRATEGIA e ORDEM_MAX (cada modelo define os seus antes de chamar: base.ESTRATEGIA, base.ORDEM_MAX = ...).
 Precos   carregar_precos (Stocks_Ind) e carregar_opcoes (Call_Put_dados); cadeia = opcoes do registo do dia (ou do mais
-         recente ate DIAS_FALLBACK_CADEIA dias antes); preco_opcao = Black-Scholes (bs_opcao do Evolucao_opc_collar) com a
+         recente ate DIAS_FALLBACK_CADEIA dias antes); preco_opcao = Black-Scholes (bs_opcao, ate 2026-11-17 no Evolucao_opc_collar) com a
          IV da recolha, sem IV usa o lastPrice; escolher_por_delta = contrato com delta mais proximo (ate DELTA_TOLERANCIA).
 Prazo    dias_uteis do dia seguinte ate ao fim (inclusive); venc_valido = vencimento aceite para as pernas (desde 2026-10-27:
          sexta-feira com >= 10 dias uteis; antes >= 8).
@@ -18,8 +18,6 @@ from statistics import NormalDist
 
 import numpy as np
 import pandas as pd
-
-from Evolucao_opc_collar import bs_opcao
 
 
 DB_FILE = r"C:\BD\Stocks.duckdb"
@@ -36,6 +34,31 @@ DIAS_FALLBACK_CADEIA = 3
 JUROS = 0.04
 
 _N = NormalDist().cdf
+VOL_MINIMA_BS = 0.01
+
+
+def bs_opcao(spot, strike, data_evolucao, vencimento, vol, tipo):
+    """Preco Black-Scholes (mesma formula de "BS precificacao.xlsx"): juro JUROS, prazo em dias uteis / 252, no dia do
+    vencimento o valor intrinseco. Ate 2026-11-17 estava no Evolucao_opc_collar.py (copiada sem mudancas)."""
+    if spot is None or strike is None or vol is None or vol < VOL_MINIMA_BS or not data_evolucao or vencimento is None:
+        return None
+    if vol > 5:  # algumas linhas inseridas manualmente gravam a IV em % (80.0 em vez de 0.80)
+        vol = vol / 100
+    dia = datetime.strptime(str(data_evolucao), "%Y%m%d").date()
+    venc = vencimento if isinstance(vencimento, date) else datetime.strptime(str(vencimento)[:10], "%Y-%m-%d").date()
+    du = int(np.busday_count(dia + timedelta(days=1), venc + timedelta(days=1)))
+    is_call = str(tipo).upper() == "CALL"
+    if du <= 0:
+        return max(spot - strike, 0.0) if is_call else max(strike - spot, 0.0)
+
+    t = du / 252
+    juros_ln = math.log(1 + JUROS)
+    d1 = (math.log(spot / strike) + ((vol ** 2) / 2 + juros_ln) * t) / (vol * math.sqrt(t))
+    d2 = d1 - vol * math.sqrt(t)
+    desconto = (1 + JUROS) ** t
+    if is_call:
+        return spot * _N(d1) - strike * _N(d2) / desconto
+    return strike * _N(-d2) / desconto - spot * _N(-d1)
 
 
 def para_data(valor) -> date:

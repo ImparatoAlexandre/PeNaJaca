@@ -36,7 +36,7 @@ import numpy as np
 import pandas as pd
 
 import Opcoes_base as base
-from Evolucao_opc_collar import bs_opcao
+from Opcoes_base import bs_opcao
 from Opcoes_base import (DIAS_FALLBACK_CADEIA, SQLITE_FILE, TABELA_TRAVAS, avaliar_com_travas, cadeia, carregar_opcoes,
                          carregar_operacoes, carregar_precos, dias_uteis, escolher_por_delta, escolher_put_por_distancia,
                          para_data, preco_opcao, ymd)
