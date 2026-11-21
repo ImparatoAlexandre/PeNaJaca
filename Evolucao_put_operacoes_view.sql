@@ -12,13 +12,17 @@
 --   etapa13:      (tabela Evolucao_etapa13, Evolucao_etapa13.py) etapa1 + etapa3 num so capital unico, com os buracos: nos dias sem
 --                 sinal das etapas 1/3, sinais da ordem so entre tickers com opcoes liquidas (oper_abertas_liq, amplitude >= 10%)
 --                 com as mesmas regras da etapa1 (ordem 1) e da etapa3; sinal = origem (etapa1, etapa3, liq_etapa1, liq_etapa3)
+--   etapa5:       (tabela Evolucao_etapa5, Evolucao_etapa5.py) sinais da view Variacoes_liq (liquidez Alta / Muito alta,
+--                 amp_med20 >= 8, amp_med5 >= amp_med20, |dist_MM50%| > 25), travados em Sinais_etapa5 na 1.a rodada; call 0.30 + put -0.30
+--                 sem limite de IV (validada a mao na tabela Vol), alvo +11% ou -11%, sem alvo sai ao close do D5;
+--                 ticker com operacao aberta nao entra de novo ate a saida (ordem = ordem no dia pela amp_med20)
 -- ordem: ordem_selecao_dia do sinal (todos os modelos)
 -- liquidez, MOM20, dist_MM50%, VR10, vol_hist20, MIN %, MAX %, maior_mov %: todas as etapas (Opcoes_base.calcular_indicadores; MIN / MAX do D1 ao D7 face ao close do sinal)
 -- hora: hora:minuto (HH:MM) da rodada em que o sinal entrou em oper_abertas (1.a selecao do dia)
 -- vol_call / vol_put: volatilidade implicita (%) usada no preco de entrada de cada opcao
 -- lucro_operacao: etapa1 a etapa4 e etapa13 = lucro de cada operacao fechada com 5000 (todos os sinais, tambem os que entram com outra operacao aberta;
 --                 capital_unico = 1 marca so os que caberiam com uma operacao de cada vez)
--- Exemplo: SELECT * FROM Evolucao_put_operacoes WHERE modelo IN ('etapa1', 'etapa2', 'etapa3', 'etapa4', 'etapa13') ORDER BY dataoperacao DESC
+-- Exemplo: SELECT * FROM Evolucao_put_operacoes WHERE modelo IN ('etapa1', 'etapa2', 'etapa3', 'etapa4', 'etapa13', 'etapa5') ORDER BY dataoperacao DESC
 
 DROP VIEW IF EXISTS Evolucao_put_operacoes;
 
@@ -63,6 +67,14 @@ WITH ops AS (
            retorno, dias_capital, CASE WHEN selecionada_capital_unico THEN 1 ELSE 0 END,
            ordem_selecao_dia, liquidez, MOM20, "dist_MM50%", VR10, vol_hist20, "MIN %", "MAX %", "maior_mov %"
     FROM Evolucao_etapa13
+    UNION ALL
+    SELECT 'etapa5', dataoperacao, hora, ticker, estrategia, close_oper,
+           strike_call, valor_call, ROUND(vol_call * 100, 1), strike_put, valor_put,
+           ROUND(vol_put * 100, 1), venc_put,
+           alvo_alta, alvo_baixa, status, SAIDA_data, saida_ativo, saida_call, saida_put, var_MAX_ativo,
+           retorno, dias_capital, CASE WHEN selecionada_capital_unico THEN 1 ELSE 0 END,
+           ordem_selecao_dia, liquidez, MOM20, "dist_MM50%", VR10, vol_hist20, "MIN %", "MAX %", "maior_mov %"
+    FROM Evolucao_etapa5
 ),
 filtradas AS (
     SELECT * FROM ops
@@ -71,6 +83,6 @@ filtradas AS (
 )
 SELECT
     f.*,
-    CASE WHEN f.modelo IN ('etapa1', 'etapa2', 'etapa3', 'etapa4', 'etapa13') AND f.status <> 'aberta'
+    CASE WHEN f.modelo IN ('etapa1', 'etapa2', 'etapa3', 'etapa4', 'etapa13', 'etapa5') AND f.status <> 'aberta'
          THEN ROUND(5000 * f.retorno / 100.0, 2) END AS lucro_operacao
 FROM filtradas f;

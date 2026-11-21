@@ -34,6 +34,7 @@ SCRIPTS = [
     "Evolucao_vol_call_put.py",
     "Evolucao_etapa3.py",  # etapa3 (segura) e etapa4 (ousada): sinais ext ordem 1-3 com VR10 < 2.5 e vol_hist20 > 70
     "Evolucao_etapa13.py",  # etapa1 + etapa3 num capital, com os buracos (oper_abertas_liq); depois do call_put e da etapa3
+    "Evolucao_etapa5.py",  # etapa5: sinais da view Variacoes_liq (amp_med20 >= 8, |dist_MM50%| > 25), alvo +-11%, D5; antes do Vol_momento
     "Posicao_momento.py",
     "Vol_momento.py",
     "Volume_OPC_strike.py",

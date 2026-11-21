@@ -1,7 +1,8 @@
 """Volatilidade do momento dos sinais ext: tabela Vol (DuckDB e SQLite do Metabase).
 
 Ativos   sinais ext (oper_abertas, dia_hist = 1) com ordem_selecao_dia <= ORDEM_MAX e liquidez em LIQUIDEZ,
-         das ultimas DIAS_SINAIS datas de operacao.
+         das ultimas DIAS_SINAIS datas de operacao; e os sinais da etapa5 (Sinais_etapa5, view Variacoes_liq) dos ultimos
+         DIAS_SINAIS pregoes da Stocks_Ind (2026-11-21). origem = ext, etapa5 ou ext+etapa5 (ordem vazia so na etapa5).
 Opcoes   cadeia lida no yfinance no momento em que o script corre (nao usa Call_Put_dados), no 1.o vencimento
          (sexta-feira) aceite por Opcoes_base.venc_valido (>= 10 dias uteis), como nos modelos:
            - call ATM: strike mais proximo do preco atual;
@@ -40,12 +41,40 @@ IV_MINIMA = 0.10     # IV abaixo disto (ou sem bid/ask) e invalida: o delta usa 
 JANELA_RV = 20
 
 COLUNAS = [
-    "data_hora", "dataoperacao", "ordem", "ticker", "vol_hist20", "liquidez", "venc", "dias_uteis",
+    "data_hora", "dataoperacao", "origem", "ordem", "ticker", "vol_hist20", "liquidez", "venc", "dias_uteis",
     "strike_call_atm", "vol_call_atm", "strike_call_delta30", "vol_call_delta30", "strike_put_delta30", "vol_put_delta30",
 ]
 
 
 def carregar_sinais(con):
+    ext = carregar_sinais_ext(con).assign(origem="ext")
+    e5 = carregar_sinais_etapa5(con).assign(origem="etapa5")
+    df = pd.concat([ext, e5], ignore_index=True)
+    if df.empty:
+        return df
+    return (df.groupby(["dataoperacao", "ticker"], as_index=False)
+              .agg(ordem=("ordem", "min"), liquidez=("liquidez", "first"), origem=("origem", lambda x: "+".join(sorted(set(x)))))
+              .sort_values(["dataoperacao", "ordem", "ticker"], ascending=[False, True, True], na_position="last"))
+
+
+def carregar_sinais_etapa5(con):
+    """Sinais da etapa5 (Sinais_etapa5) dos ultimos DIAS_SINAIS pregoes da Stocks_Ind."""
+    existe = con.execute("SELECT count(*) FROM information_schema.tables WHERE table_name = 'Sinais_etapa5'").fetchone()[0]
+    if not existe:
+        return pd.DataFrame(columns=["dataoperacao", "ordem", "ticker", "liquidez"])
+    return con.execute(
+        f"""
+        WITH datas AS (SELECT DISTINCT CAST(data AS VARCHAR) AS d FROM Stocks_Ind ORDER BY 1 DESC LIMIT {DIAS_SINAIS})
+        SELECT s.dataoperacao, CAST(NULL AS INTEGER) AS ordem, trim(s.ticker) AS ticker, any_value(l.liquidez_classificacao) AS liquidez
+        FROM Sinais_etapa5 s
+        LEFT JOIN Stocks_OPC_liquidez l ON trim(l.ticker) = trim(s.ticker)
+        WHERE s.dataoperacao IN (SELECT d FROM datas)
+        GROUP BY 1, 2, 3
+        """
+    ).fetchdf()
+
+
+def carregar_sinais_ext(con):
     lista = ",".join(f"'{x}'" for x in LIQUIDEZ)
     return con.execute(
         f"""
@@ -161,13 +190,14 @@ def construir(con):
             print(f"{t}: erro {exc}")
         leituras[t]["vol_hist20"] = int(round(rv20 * 100)) if rv20 is not None and rv20 == rv20 else None
         print(f"[{i}/{sinais.ticker.nunique()}] {t}: vol_call_atm={leituras[t].get('vol_call_atm')}", flush=True)
-    linhas = [{"data_hora": agora.strftime("%Y-%m-%d %H:%M"), "dataoperacao": s.dataoperacao, "ordem": s.ordem,
+    linhas = [{"data_hora": agora.strftime("%Y-%m-%d %H:%M"), "dataoperacao": s.dataoperacao, "origem": s.origem, "ordem": s.ordem,
                "ticker": s.ticker, "liquidez": s.liquidez, **leituras[s.ticker]} for s in sinais.itertuples()]
     df = pd.DataFrame(linhas).reindex(columns=COLUNAS)
     con.register("df_vol", df)
     con.execute(f"CREATE OR REPLACE TABLE {TABELA_DESTINO} AS SELECT * FROM df_vol")
     con.execute(f"CREATE TABLE IF NOT EXISTS {TABELA_HIST} AS SELECT * FROM df_vol WHERE 1=0")
     con.execute(f"ALTER TABLE {TABELA_HIST} ADD COLUMN IF NOT EXISTS vol_hist20 INTEGER")
+    con.execute(f"ALTER TABLE {TABELA_HIST} ADD COLUMN IF NOT EXISTS origem VARCHAR")
     con.execute(f"INSERT INTO {TABELA_HIST} BY NAME SELECT * FROM df_vol")
     con.unregister("df_vol")
     df_hist = con.execute(f"SELECT {', '.join(COLUNAS)} FROM {TABELA_HIST} ORDER BY data_hora DESC, dataoperacao DESC, ordem, ticker").fetchdf()
