@@ -1,7 +1,7 @@
 -- Operacoes por modelo desde out/2025 (etapa1: Evolucao_call_put; etapa2: Evolucao_vol_call_put; etapa3: Evolucao_etapa3; etapa4: Evolucao_etapa4; etapa13: Evolucao_etapa13)
 -- Modelos (o modelo stock, tabela Evolucao_stock, saiu da view em 2026-11-11):
 --   etapa1:       (tabela Evolucao_call_put) compra call delta 0.30 e put delta -0.30 (1 call + 1 put, retorno do par), so sinais ext ordem 1,
---                 IV da call e da put <= 75%, sai quando o ativo toca +7% ou -7%, sem alvo sai ao close do D7 (status corte)
+--                 IV da call e da put <= 75%, sai quando o ativo toca +7% ou -7%, sem alvo sai ao close do D5 (status corte; D7 ate 2026-11-24)
 --                 (alvo_saida = alvo de alta, stop_saida = alvo de baixa)
 --   etapa2:       (tabela Evolucao_vol_call_put) igual a etapa1, mas entre os sinais ext ordem 1 a 3 entra 1 par por dia, o de menor vol media (call + put) / 2,
 --                 sem par com IV da call ou da put acima de 80%, alvo +10% ou -10%, sem alvo sai ao close do D5 (status corte)

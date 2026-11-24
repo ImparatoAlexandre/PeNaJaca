@@ -1,5 +1,5 @@
 -- Resultado por mes por modelo (tabelas Evolucao_call_put = etapa1 e Evolucao_vol_call_put = etapa2)
---   etapa1:   compra call delta 0.30 e put delta -0.30 (1 call + 1 put, retorno do par), ext ordem 1, IV <= 75% por perna, ±7%, corte D7
+--   etapa1:   compra call delta 0.30 e put delta -0.30 (1 call + 1 put, retorno do par), ext ordem 1, IV <= 75% por perna, ±7%, corte D5 (D7 ate 2026-11-24)
 --   etapa2:   igual, ext ordem 1-3 (par de menor vol do dia), IV <= 80% por perna, ±10%, corte D5
 -- Mes = mes da data da operacao. So operacoes fechadas.
 -- soma_todos        soma dos retornos de todos os sinais do mes

@@ -4,7 +4,7 @@ Fontes   prioridade 0: as operacoes ja calculadas das tabelas Evolucao_call_put 
          (mesmo sinal nas duas: fica o da etapa1).
          prioridade 1 (buracos): sinais de oper_abertas_liq (Operacoes_abertas_ext: ordem so entre os tickers com opcoes liquidas,
          ordem_liq <= 3 e amplitude_candle >= 10%), com as mesmas regras:
-           liq_etapa1: ordem_liq = 1, IV da call e da put <= 75%, ±7%, corte D7 (regras do Evolucao_call_put)
+           liq_etapa1: ordem_liq = 1, IV da call e da put <= 75%, ±7%, corte D5 (regras do Evolucao_call_put)
            liq_etapa3: ordem_liq <= 3, VR10 < 2.5, vol_hist20 > 70, IV de cada perna em ]60%, 80%], ±7%, corte D5 (Evolucao_etapa3)
          Sinal de buraco igual (dia e ticker) a uma operacao das etapas 1/3 nao entra de novo.
 Capital  capital unico partilhado: uma operacao de cada vez; no mesmo dia entram primeiro as etapas 1/3, depois os buracos

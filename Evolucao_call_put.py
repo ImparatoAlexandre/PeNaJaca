@@ -37,7 +37,9 @@ ORDEM_MAX = 1
 CALL_DELTA = 0.30
 PUT_DELTA = -0.30
 ALVO_PCT = 0.07      # alvo de alta e de baixa no ativo (era 0.10 ate 2026-11-08)
-CORTE_DU = 7         # sem alvo: sai ao close do 7.o dia de pregao apos a entrada (None = ate ao vencimento)
+CORTE_DU = 5         # sem alvo: sai ao close do 5.o dia de pregao apos a entrada (None = ate ao vencimento)
+                     # 2026-11-24: D7 -> D5 (todas as etapas em D5; simulacao: etapa1 capital unico 55.8k -> 51.2k,
+                     # 2 cortes QCOM/SPCX; etapa13 76.2k -> 72.6k, drawdown composto -52% -> -40%)
 VOL_MAX = 0.75       # IV da call ou da put acima disto: o sinal nao entra (2026-11-08: 80% -> 70%; 2026-11-10: 70% -> 75%,
                      # +12 sinais, todos tocaram ±7%, 0 cortes, pior igual -25.7%, mediana +20.8% -> +15.5%)
 # Todos os sinais ficam na tabela (tambem os que entram com outra operacao aberta); selecionada_capital_unico so marca
