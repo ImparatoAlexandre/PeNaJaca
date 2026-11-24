@@ -14,7 +14,8 @@
 --   etapa5:       (tabela Evolucao_etapa5, Evolucao_etapa5.py) sinais da view Variacoes_liq (liquidez Alta / Muito alta,
 --                 amp_med20 >= 8, amp_med5 >= amp_med20, |dist_MM50%| > 25), travados em Sinais_etapa5 na 1.a rodada; call 0.30 + put -0.30
 --                 sem limite de IV (validada a mao na tabela Vol), alvo +11% ou -11%, sem alvo sai ao close do D5;
---                 ticker com operacao aberta nao entra de novo ate a saida (ordem = ordem no dia pela amp_med20)
+--                 ticker com operacao aberta nao entra de novo ate a saida; desde 2026-11-24 so com IV media do par < vol_hist20,
+--                 ordem = ordem no dia pela razao IV / vol_hist20 e capital_unico = ate 2 operacoes ao mesmo tempo (10k)
 -- ordem: ordem_selecao_dia do sinal (todos os modelos)
 -- liquidez, MOM20, dist_MM50%, VR10, vol_hist20, MIN %, MAX %, maior_mov %: todas as etapas (Opcoes_base.calcular_indicadores; MIN / MAX do D1 ao D7 face ao close do sinal)
 -- hora: hora:minuto (HH:MM) da rodada em que o sinal entrou em oper_abertas (1.a selecao do dia)

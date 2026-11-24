@@ -7,9 +7,13 @@ Trava    o sinal fica gravado em TABELA_SINAIS na 1.a rodada em que aparece (com
          Entrada_opc_travada (modelo etapa5), como nas outras etapas.
 Regra    um ticker com operacao aberta nao entra de novo: os sinais seguintes do mesmo ticker so contam a partir do dia de saida
          (alvo, corte ou vencimento); no proprio dia da saida pode entrar outro sinal.
-Opcoes   sem limite de IV (a IV e validada a mao na tabela Vol, que tambem mostra os tickers da etapa5).
+Filtro   (2026-11-24) so entra com IV media do par (call + put) / 2 < vol_hist20 do ativo (opcao mais barata que o movimento
+         realizado). Os outros ficam na tabela com status 'iv_acima_vol20' (fora da view) e nao bloqueiam o ticker.
+         Historico out/25-nov/26: IV < vol20 83 op, acerto 76%, mediana +22.6%; IV >= vol20 15 op, acerto 47%, -2.6k sem outliers.
 Saida    alvo +-ALVO (11%) no ativo; sem alvo sai ao close do CORTE.o dia de pregao (D5). Retorno e lucro como no Evolucao_call_put.
-ordem    ordem do sinal no dia pela amp_med20 (1 = maior amplitude); define a entrada no capital unico.
+ordem    ordem do sinal no dia pela razao IV / vol_hist20 (1 = opcao mais barata face ao movimento); define a prioridade no capital.
+Capital  ate POSICOES_MAX (2) operacoes ao mesmo tempo, VALOR_OPERACAO (5000) cada = 10k; selecionada_capital_unico (capital_unico
+         na view) marca as que cabem nas 2 posicoes. Simulacao out/25-nov/26: 56 op, 48.2k (1 posicao: 18.8k; 5 posicoes: 83.4k com 25k).
 Grava    tabela Evolucao_etapa5 na DuckDB e no SQLite do Metabase (e TABELA_SINAIS / Entrada_opc_travada).
 """
 import sqlite3
@@ -29,6 +33,8 @@ TABELA_DESTINO = "Evolucao_etapa5"
 TABELA_SINAIS = "Sinais_etapa5"
 ALVO = 0.11
 CORTE = 5
+POSICOES_MAX = 2          # operacoes abertas ao mesmo tempo (2026-11-24; antes 1 = capital unico)
+STATUS_IV = "iv_acima_vol20"
 
 COLUNAS = cp.COLUNAS + base.INDICADORES + ["amp_med20", "amp_med5"]
 
@@ -100,7 +106,13 @@ def avaliar_sem_repetir(con, sinais, px, opc):
             e = r.pop("_entrada", None)
             if e is not None and trava is None and op.dataoperacao == hoje and op.hora:
                 novas.append(dict(e, dataoperacao=op.dataoperacao, ticker=op.ticker, hora=op.hora, close_oper=op.close_oper))
-            if r.get("status") in cp.STATUS_FECHADAS + ["aberta"]:
+            valida = r.get("status") in cp.STATUS_FECHADAS + ["aberta"]
+            if valida:
+                iv = (r["vol_call"] + r["vol_put"]) / 2 * 100
+                r["_ratio"] = iv / op.vol20 if op.vol20 == op.vol20 and op.vol20 else float("nan")
+                if not iv < op.vol20:  # vol20 vazia tambem fica fora
+                    r["status"], valida = STATUS_IV, False
+            if valida:
                 ocupado_ate = str(r["fim_capital"])
             r["amp_med20"], r["amp_med5"] = op.amp_med20, op.amp_med5
             linhas.append(r)
@@ -110,14 +122,33 @@ def avaliar_sem_repetir(con, sinais, px, opc):
     return pd.DataFrame(linhas)
 
 
+def marcar_capital(df):
+    """Ate POSICOES_MAX operacoes ao mesmo tempo; no mesmo dia entra primeiro a de menor razao IV / vol_hist20.
+    Uma posicao fica livre no dia de saida (fim_capital), como no capital unico das outras etapas."""
+    df["selecionada_capital_unico"] = False
+    validas = df[df.status.isin(cp.STATUS_FECHADAS + ["aberta"])]
+    df.loc[validas.index, "ordem_selecao_dia"] = validas.groupby("dataoperacao")._ratio.rank(method="first").astype(int)
+    abertos = []
+    for i in validas.sort_values(["dataoperacao", "_ratio", "ticker"]).index:
+        d = df.at[i, "dataoperacao"]
+        abertos = [f for f in abertos if f > d]
+        if len(abertos) < POSICOES_MAX:
+            df.at[i, "selecionada_capital_unico"] = True
+            abertos.append(str(df.at[i, "fim_capital"]))
+    return df
+
+
 def construir(con):
     sinais = atualizar_sinais(con)
+    sinais["vol20"] = pd.to_numeric(base.calcular_indicadores(con, sinais).vol_hist20, errors="coerce").values
     desde = sinais.dataoperacao.min()
     tickers = sinais.ticker.unique()
     px = base.carregar_precos(con, tickers, desde)
     opc = base.carregar_opcoes(con, tickers, base.ymd(base.para_data(desde) - pd.Timedelta(days=base.DIAS_FALLBACK_CADEIA)))
     df = avaliar_sem_repetir(con, sinais, px, opc)
-    df = base.juntar_indicadores(con, cp.marcar_capital_unico(df)).reindex(columns=COLUNAS)
+    if "_ratio" not in df:
+        df["_ratio"] = float("nan")
+    df = base.juntar_indicadores(con, marcar_capital(df)).reindex(columns=COLUNAS)
     for col in ["hora", "estrategia", "venc_put", "SAIDA_data", "status", "liquidez"]:
         df[col] = df[col].astype("object")
     con.register("df_etapa5", df)
