@@ -32,7 +32,7 @@ SCRIPTS = [
     # "Evolucao_stock.py",  # modelo stock fora da view desde 2026-11-11 (Etapa 1 e Etapa 2 nao dependem dele)
     "Evolucao_call_put.py",
     "Evolucao_vol_call_put.py",
-    "Evolucao_etapa3.py",  # etapa3 (segura) e etapa4 (ousada): sinais ext ordem 1-3 com VR10 < 2.5 e vol_hist20 > 70
+    "Evolucao_etapa3.py",  # etapa3 (segura): sinais ext ordem 1-3 com VR10 < 2.5 e vol_hist20 > 70 (etapa4 fora desde 2026-11-24)
     "Evolucao_etapa13.py",  # etapa1 + etapa3 num capital, com os buracos (oper_abertas_liq); depois do call_put e da etapa3
     "Evolucao_etapa5.py",  # etapa5: sinais da view Variacoes_liq (amp_med20 >= 8, |dist_MM50%| > 25), alvo +-11%, D5; antes do Vol_momento
     "Posicao_momento.py",

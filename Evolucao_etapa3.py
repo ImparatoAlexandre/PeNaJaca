@@ -1,20 +1,22 @@
-"""Etapas 3 e 4 (na view: modelos etapa3 e etapa4). Compra de call e put (delta 0.30 / -0.30) como a Etapa 1, nos sinais ext
-que tendem a mexer muito. A etapa3 e a regra segura (compor capital), a etapa4 a ousada.
+"""Etapa 3 (na view: modelo etapa3). Compra de call e put (delta 0.30 / -0.30) como a Etapa 1, nos sinais ext
+que tendem a mexer muito. A etapa3 e a regra segura (compor capital).
+A etapa4 (ousada: mesmos sinais, IV <= 100%, ±10%, D5) saiu do processo em 2026-11-24: so 19 operacoes no capital unico
+junto com a etapa2 (+9k sem outliers em 14 meses, mesmo risco); a etapa2 sozinha ocupa ~67% do capital. Tabela antiga em
+Evolucao_etapa4_backup_20261124.
 
 Sinais   oper_abertas com estrategia = "ext", dia_hist = 1 e ordem_selecao_dia <= ORDEM_MAX (3), com opcoes liquidas
          (Alta / Muito alta, mesma selecao das Etapas 1 e 2: Opcoes_base.carregar_operacoes).
-Filtro   VR10 < VR10_MAX (2.5; era 1.3) e vol_hist20 > VOL_MIN (70%), comum as duas etapas.
+Filtro   VR10 < VR10_MAX (2.5; era 1.3) e vol_hist20 > VOL_MIN (70%).
 Regras   (MODELOS) IV de cada perna (call e put) em ]iv_min, iv_max], alvo ±alvo no ativo, corte ao close do corte.o dia de pregao:
-           etapa3 (segura): IV 60-80%, ±7%, D5   -> historico out/25-nov/26 (VR10 < 2.5): 62 sinais, acerto 81%, pior -23%
-           etapa4 (ousada): IV <= 100%, ±10%, D5 -> historico (VR10 < 2.5): 160 sinais, acerto 79%, pior -65%
+           etapa3 (segura): IV 60-80%, ±7%, D5   -> historico out/25-nov/26 (VR10 < 2.5): 63 sinais, acerto 79%, pior -23%
          (2026-11-11; antes a etapa3 era ±10%, D7, sem limite de IV.) Sinais sem opcoes ficam na tabela (a view nao os mostra).
 Colunas  (Opcoes_base.calcular_indicadores, tambem usadas nas etapas 1 e 2) MOM20, dist_MM50% e VR10: Stocks_Ind no dia do sinal.
          vol_hist20: vol realizada anualizada (%) dos JANELA_VOL retornos diarios ate ao dia do sinal (mesma conta do Vol_momento).
          MIN % / MAX %: menor Min e maior Max do D1 ao D7 face ao close do sinal (como a Evolucao); maior_mov % = maior entre |MIN| e |MAX|.
          liquidez: classificacao atual da Stocks_OPC_liquidez.
 Entrada  saida, retorno e capital unico: iguais ao Evolucao_call_put (avaliar), com VALOR_OPERACAO no par.
-Trava    entrada dos sinais de hoje em Entrada_opc_travada (modelo etapa3 / etapa4).
-Grava    tabelas Evolucao_etapa3 e Evolucao_etapa4 na DuckDB e no SQLite do Metabase.
+Trava    entrada dos sinais de hoje em Entrada_opc_travada (modelo etapa3).
+Grava    tabela Evolucao_etapa3 na DuckDB e no SQLite do Metabase.
 Opcoes   ordens 2 e 3 antes de set/26 sem cadeia real: completadas com Completar_opcoes_BS.py --tabela=Evolucao_etapa3 (precos BS).
 """
 import sqlite3
@@ -37,7 +39,6 @@ VOL_MIN = 70.0
 
 MODELOS = {
     "etapa3": dict(tabela="Evolucao_etapa3", iv_min=0.60, iv_max=0.80, alvo=0.07, corte=5),
-    "etapa4": dict(tabela="Evolucao_etapa4", iv_min=None, iv_max=1.00, alvo=0.10, corte=5),
 }
 
 INDICADORES = base.INDICADORES  # calculados no Opcoes_base (comuns as etapas 1 a 4)

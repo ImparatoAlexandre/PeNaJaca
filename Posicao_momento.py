@@ -1,11 +1,11 @@
-"""Posicao no momento da captura das operacoes da view Evolucao_put_operacoes (mesmas linhas e modelos: etapa1 a etapa4 e etapa13).
+"""Posicao no momento da captura das operacoes da view Evolucao_put_operacoes (mesmas linhas e modelos: etapa1, etapa2, etapa3, etapa13 e etapa5).
 
 Ativo    close_atual = close da ultima linha do ticker em Stocks_Ind; Var%ativo = close_atual / close_oper - 1 (%).
 Opcoes   ultima captura do ticker em Call_Put_dados, mesmo tipo, vencimento e strike da operacao:
            valor = meio entre bid e ask (sem bid/ask: lastPrice); vol = impliedVolatility em %.
          Contrato fora da ultima captura do ticker (vencido ou sem coleta): valor e vol vazios.
 Retorno  retorno% no momento, vendendo agora as opcoes compradas na entrada (mesma conta do modelo):
-           etapa1 a etapa4 e etapa13 (antes call_put e vol_call_put) = par 1 call + 1 put: (call_atual + put_atual) / (valor_call + valor_put) - 1;
+           etapa1, etapa2, etapa3, etapa13 e etapa5 (antes call_put e vol_call_put) = par 1 call + 1 put: (call_atual + put_atual) / (valor_call + valor_put) - 1;
            stock = Var%ativo.
 Prazo    dias_vencimento = dias uteis da data da captura ate ao vencimento (como no modelo), minimo 0.
 Grava    tabela Posicao_momento na DuckDB e no SQLite do Metabase (substituida a cada execucao).
@@ -98,7 +98,7 @@ def construir(con):
     ops["data_captura"] = ops.ticker.str.strip().str.upper().map(capturas).fillna(ops.data_preco)
     ops["Var%ativo"] = ((ops.close_atual / ops.close_oper - 1) * 100).round(2)
     ret_call_put = (ops.valor_call_atual + ops.valor_put_atual) / (ops.valor_call + ops.valor_put) - 1
-    ops["retorno%"] = np.where(ops.modelo.isin(["etapa1", "etapa2", "etapa3", "etapa4", "etapa13", "call_put", "vol_call_put"]), ret_call_put * 100, ops["Var%ativo"]).round(2)
+    ops["retorno%"] = np.where(ops.modelo.isin(["etapa1", "etapa2", "etapa3", "etapa13", "etapa5", "call_put", "vol_call_put"]), ret_call_put * 100, ops["Var%ativo"]).round(2)
 
     venc = pd.to_datetime(ops.venc_put, errors="coerce")
     captura = pd.to_datetime(ops.data_captura, format="%Y%m%d", errors="coerce")
