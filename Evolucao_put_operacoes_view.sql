@@ -82,7 +82,12 @@ filtradas AS (
       AND status IN ('alvo', 'corte', 'vencimento', 'alvo_alta', 'alvo_baixa', 'aberta')
 )
 SELECT
-    f.*,
+    f.modelo, f.dataoperacao, f.hora, f.ticker, f.sinal, f.close_oper,
+    f.vol_hist20, f.vol_call, f.vol_put,
+    f.strike_call, f.valor_call, f.strike_put, f.valor_put, f.venc_put,
+    f.alvo_saida, f.stop_saida, f.status, f.SAIDA_data, f.saida_ativo, f.saida_call, f.saida_put, f.var_MAX_ativo,
+    f.retorno, f.dias_capital, f.capital_unico,
+    f.ordem, f.liquidez, f.MOM20, f."dist_MM50%", f.VR10, f."MIN %", f."MAX %", f."maior_mov %",
     CASE WHEN f.modelo IN ('etapa1', 'etapa2', 'etapa3', 'etapa4', 'etapa13', 'etapa5') AND f.status <> 'aberta'
          THEN ROUND(5000 * f.retorno / 100.0, 2) END AS lucro_operacao
 FROM filtradas f;
