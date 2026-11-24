@@ -5,8 +5,8 @@ Sinais   view Variacoes_liq (Variacoes_liq.sql): liquidez Alta / Muito alta, amp
 Trava    o sinal fica gravado em TABELA_SINAIS na 1.a rodada em que aparece (com o close desse momento e a hora): se a Stocks_Ind
          do dia mudar e o ticker sair da view, o sinal continua. A entrada das opcoes (strikes, IV, valores) fica em
          Entrada_opc_travada (modelo etapa5), como nas outras etapas.
-Regra    um ticker com operacao aberta nao entra de novo: os sinais seguintes do mesmo ticker so contam a partir do dia de saida
-         (alvo, corte ou vencimento); no proprio dia da saida pode entrar outro sinal.
+Regra    todos os sinais entram na tabela, tambem os de um ticker com operacao ainda aberta (2026-11-24; antes os sinais
+         seguintes do mesmo ticker so contavam a partir do dia de saida). O limite fica so no capital (POSICOES_MAX).
 Filtro   (2026-11-24) so entra com IV media do par (call + put) / 2 < vol_hist20 do ativo (opcao mais barata que o movimento
          realizado). Os outros ficam na tabela com status 'iv_acima_vol20' (fora da view) e nao bloqueiam o ticker.
          Historico out/25-nov/26: IV < vol20 83 op, acerto 76%, mediana +22.6%; IV >= vol20 15 op, acerto 47%, -2.6k sem outliers.
@@ -90,30 +90,24 @@ def atualizar_sinais(con):
     return s
 
 
-def avaliar_sem_repetir(con, sinais, px, opc):
-    """Avalia os sinais por ticker em ordem de data; enquanto um ticker tem operacao aberta os sinais dele nao entram.
+def avaliar_sinais(con, sinais, px, opc):
+    """Avalia todos os sinais (tambem os de um ticker com operacao aberta) e tira os de IV >= vol_hist20 (STATUS_IV).
     Sinais de hoje gravam a entrada das opcoes em Entrada_opc_travada (1.a rodada); as rodadas seguintes reutilizam-na."""
     travas = base.carregar_travas(con, MODELO)
     hoje = base.ymd(date.today())
     linhas, novas = [], []
     for ticker, g in sinais.sort_values(["ticker", "dataoperacao"]).groupby("ticker"):
-        ocupado_ate = ""
         for op in g.itertuples():
-            if op.dataoperacao < ocupado_ate:
-                continue
             trava = travas.get((op.dataoperacao, op.ticker, op.hora))
             r = cp.avaliar(op, px.get(ticker), opc.get(ticker.upper()), trava, alvo_pct=ALVO, corte_du=CORTE)
             e = r.pop("_entrada", None)
             if e is not None and trava is None and op.dataoperacao == hoje and op.hora:
                 novas.append(dict(e, dataoperacao=op.dataoperacao, ticker=op.ticker, hora=op.hora, close_oper=op.close_oper))
-            valida = r.get("status") in cp.STATUS_FECHADAS + ["aberta"]
-            if valida:
+            if r.get("status") in cp.STATUS_FECHADAS + ["aberta"]:
                 iv = (r["vol_call"] + r["vol_put"]) / 2 * 100
                 r["_ratio"] = iv / op.vol20 if op.vol20 == op.vol20 and op.vol20 else float("nan")
                 if not iv < op.vol20:  # vol20 vazia tambem fica fora
-                    r["status"], valida = STATUS_IV, False
-            if valida:
-                ocupado_ate = str(r["fim_capital"])
+                    r["status"] = STATUS_IV
             r["amp_med20"], r["amp_med5"] = op.amp_med20, op.amp_med5
             linhas.append(r)
     gravadas = base.gravar_travas(con, MODELO, novas)
@@ -145,7 +139,7 @@ def construir(con):
     tickers = sinais.ticker.unique()
     px = base.carregar_precos(con, tickers, desde)
     opc = base.carregar_opcoes(con, tickers, base.ymd(base.para_data(desde) - pd.Timedelta(days=base.DIAS_FALLBACK_CADEIA)))
-    df = avaliar_sem_repetir(con, sinais, px, opc)
+    df = avaliar_sinais(con, sinais, px, opc)
     if "_ratio" not in df:
         df["_ratio"] = float("nan")
     df = base.juntar_indicadores(con, marcar_capital(df)).reindex(columns=COLUNAS)
